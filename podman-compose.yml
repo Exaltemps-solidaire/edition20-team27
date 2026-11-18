@@ -1,0 +1,17 @@
+name: team27
+networks:
+  core-network:
+    external: true
+services:
+  frontend:
+    image: localhost:5000/team27/frontend:dev
+    networks: [core-network]
+    ports: ["8080:80"]
+    restart: unless-stopped
+  api:
+    image: localhost:5000/team27/api:dev
+    networks: [core-network]
+    ports: ["8081:8081"]
+    restart: unless-stopped
+    environment:
+      PORT: "8081"
