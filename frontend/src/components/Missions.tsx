@@ -216,9 +216,15 @@ function CarteMission({
     <article className="card">
       {entete}
       <div className="two">
-        <button className="btn" onClick={() => (m.recurrence ? setChoixDuree(true) : onStatut("yes"))}>
-          Je tente
-        </button>
+        {m.verrouillee ? (
+          <button className="btn verrou" disabled title="Sarah débloque cette mission quand ta formation est validée">
+            🔒 Après ta formation {m.formation?.nom}
+          </button>
+        ) : (
+          <button className="btn" onClick={() => (m.recurrence ? setChoixDuree(true) : onStatut("yes"))}>
+            Je tente
+          </button>
+        )}
         <button className="btn o" onClick={() => onStatut("no")}>
           Pas cette semaine
         </button>

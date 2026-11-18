@@ -47,6 +47,8 @@ export type MissionProposee = {
   statut: StatutMission;
   // Itérations 9 et 10 (facultatifs côté front : absents = null).
   formation?: { id: EtapeFormation; nom: string; chemin: string } | null;
+  /** Vrai tant que la formation requise n'est pas validée par Sarah (itération 16). */
+  verrouillee?: boolean;
   recurrence?: Recurrence | null;
   inscriteJusquau?: string | null;
   /** Réponse au rappel de la semaine du prochain créneau (null : pas encore répondu). */

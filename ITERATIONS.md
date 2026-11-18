@@ -142,6 +142,11 @@ Création du profil par la chargée (back-office), validation des pitchs et cré
 - **Constats** sur l'URL publique : le point de départ du chemin dessiné restait bleu (couleur codée en dur avant la DA) ; la zone « Un mot pour Sarah » était écrasée à une ligne ; surtout, **deux testeurs incarnant Camille en même temps s'écrasaient** (le dossier de test a pris le prénom d'une autre personne pendant le tour de test).
 - **Bilan** : point de départ en rouge L'Burn, hauteur minimale des zones de texte, et **une BURN'ette par appareil** : l'écran « Qui êtes-vous ? » reste, mais chaque appareil reçoit son propre identifiant (gardé dans le navigateur), et Sarah voit chaque testeur comme une BURN'ette distincte. Fichiers : `lib/personas.ts`, `lib/api.ts`, `components/Icones.tsx`, `globals.css`. Tests : `personas.test.ts`, `api.test.ts`.
 
+## Itération 16 : la formation débloque la mission (passation : « la fin d'une formation ne débloque rien »)
+
+- **Critères d'acceptation** : étant donné une mission qui exige la pair-aidance, tant que Sarah ne l'a pas validée, alors « Je tente » est remplacé par « 🔒 Après ta formation Pair-aidance » et l'API refuse (409) ; quand Sarah coche la pair-aidance, alors la mission se débloque.
+- **Bilan** : fait (~8 min). `missionVerrouillee` et champ `verrouillee` (`api/src/domaine.ts`), refus 409 dans `PUT /moi/missions/:id` (`routes.ts`), bouton verrouillé (`components/Missions.tsx`). Tests : `routes.test.ts` (verrouillée → 409 → validée → débloquée).
+
 ## À venir
 
 - Sarah ajuste les missions d'une BURN'ette (retour 9) : plus de 15 minutes, reporté après le hackathon.

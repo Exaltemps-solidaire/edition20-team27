@@ -82,6 +82,8 @@ export type MissionProposee = {
   pourquoi: string[];
   statut: StatutMission;
   formation: Formation | null;
+  /** Itération 16 : vrai tant que la formation requise n'est pas validée par Sarah. */
+  verrouillee: boolean;
   recurrence: Recurrence | null;
   inscriteJusquau: string | null;
   /** Réponse au rappel pour la semaine du prochain créneau (null : pas encore répondu). */
@@ -109,7 +111,7 @@ export type Charge = { minutesEngagees: number; minutesDisponibles: number; surE
 
 type MissionCatalogue = Omit<
   MissionProposee,
-  "pourquoi" | "statut" | "formation" | "recurrence" | "inscriteJusquau" | "disponibiliteSemaine" | "rappel"
+  "pourquoi" | "statut" | "formation" | "verrouillee" | "recurrence" | "inscriteJusquau" | "disponibiliteSemaine" | "rappel"
 > & { tags: string[]; formation?: Formation; recurrence?: Recurrence };
 
 export const PRENOM_MAX = 40;
@@ -333,6 +335,11 @@ function rappelDe(m: MissionStockee, recurrence: Recurrence | undefined, mainten
   return { rappel: { semaine, date: prochain.toISOString().slice(0, 10) }, disponibiliteSemaine: m.disponibilites?.[semaine] ?? null };
 }
 
+/** La formation débloque la mission : verrouillée tant que l'étape requise n'est pas validée. */
+export function missionVerrouillee(formation: { id: string } | null | undefined, validees: readonly string[] | undefined): boolean {
+  return !!formation && !(validees ?? []).includes(formation.id);
+}
+
 export function etatMoi(dossier: Dossier | null, maintenant: Date = new Date()): EtatMoi {
   if (!dossier) return { participant: null, missions: [], meteoDeverrouillee: false };
   const missions = dossier.missions.flatMap((m) => {
@@ -342,6 +349,7 @@ export function etatMoi(dossier: Dossier | null, maintenant: Date = new Date()):
       id: c.id, titre: c.titre, duree: c.duree, effort: c.effort, lieu: c.lieu, avec: c.avec, objectif: c.objectif,
       details: c.details.map(([a, b]) => [a, b]), pourquoi: m.pourquoi, statut: m.statut,
       formation: c.formation ? { ...c.formation } : null,
+      verrouillee: missionVerrouillee(c.formation, dossier.participant.formationsValidees),
       recurrence: c.recurrence ? { ...c.recurrence } : null,
       inscriteJusquau: m.inscriteJusquau ?? null,
       ...rappelDe(m, c.recurrence, maintenant),

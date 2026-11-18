@@ -108,6 +108,12 @@ describe("router", () => {
     dossier.missions.push({ id: 7, statut: "open", pourquoi: [] });
     await store.enregistrer(dossier);
 
+    // Itération 16 : verrouillée tant que la pair-aidance n'est pas validée par Sarah
+    expect(m7(await appel("GET", "/api/v1/moi"))).toMatchObject({ verrouillee: true });
+    expect((await appel("PUT", "/api/v1/moi/missions/7", { statut: "yes", dureeMois: 6 })).statut).toBe(409);
+    await sarah("PUT", `/api/v1/accompagnante/participants/${ID}/formations`, { formation: "pair-aidance", validee: true });
+    expect(m7(await appel("GET", "/api/v1/moi"))).toMatchObject({ verrouillee: false });
+
     expect((await appel("PUT", "/api/v1/moi/missions/7", { statut: "yes", dureeMois: 2 })).statut).toBe(400);
     expect((await appel("PUT", "/api/v1/moi/missions/1", { statut: "yes", dureeMois: 3 })).statut).toBe(400);
     expect((await dispo({ semaine: "2026-W47", disponible: true })).statut).toBe(409); // pas inscrite

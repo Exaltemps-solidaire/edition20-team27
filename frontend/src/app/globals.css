@@ -171,3 +171,6 @@ h1[tabindex]:focus:not(:focus-visible) { outline: none; }
 .card.chemin .steps { margin: 0; }
 .card.chemin .step { cursor: default; padding: 6px 0 8px; }
 .cgu { display: flex; flex-direction: column; gap: 8px; }
+
+/* Itération 16 : mission verrouillée tant que la formation n'est pas validée */
+.btn.verrou { opacity: 1; background: var(--doux, #fee3e2); color: var(--ink); border: 2px dashed var(--indigo); font-size: 13px; line-height: 1.2; }

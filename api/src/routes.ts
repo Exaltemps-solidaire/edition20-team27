@@ -3,7 +3,7 @@
 // sans retirer le préfixe : les routes métier sont sous /api/v1/... ; /health et /sante à la racine.
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
-  DUREES_INSCRIPTION, ETAPE_MAX, ETAPES_FORMATION, FORMATS, STATUTS, etatMoi, finInscription, fusionnerMissions, inscriptionEnCours,
+  DUREES_INSCRIPTION, ETAPE_MAX, ETAPES_FORMATION, FORMATS, STATUTS, etatMoi, finInscription, fusionnerMissions, missionVerrouillee, inscriptionEnCours,
   lireIdParticipant, missionDuCatalogue, proposerMissions, semaineValide, suiviParticipant, validerProfil, validerRetour,
 } from "./domaine.ts";
 import type { Dossier, EtapeFormation, FormatRdv, StatutMission } from "./domaine.ts";
@@ -82,6 +82,11 @@ async function routesParticipante(req: Requete, chemin: string, store: Store): P
     if (!(STATUTS as readonly unknown[]).includes(statut)) return erreur(400, "statut doit valoir open, yes, no ou done");
     const cible = dossier.missions.find((m) => m.id === Number(mission[1]));
     if (!cible) return erreur(404, "mission absente de ta liste");
+    // Itération 16 : « Je tente » impossible tant que la formation requise n'est pas validée.
+    const requise = missionDuCatalogue(cible.id)?.formation;
+    if (statut === "yes" && cible.statut !== "yes" && missionVerrouillee(requise, dossier.participant.formationsValidees)) {
+      return erreur(409, `formation requise : ${requise?.nom}`);
+    }
     // Itération 10 : « Je tente » sur une mission récurrente s'accompagne d'une durée d'inscription.
     const dureeMois = champ(corps, "dureeMois");
     if (dureeMois !== undefined) {
