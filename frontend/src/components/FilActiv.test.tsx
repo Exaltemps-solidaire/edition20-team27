@@ -13,6 +13,8 @@ const ACTIVE: EtatMoi = {
     envies: [],
     eviter: [],
     mot: "",
+    engagement: false,
+    cgu: true,
     etape: 2,
     formatRdv: null,
     lanceLe: "2026-11-18T09:00:00Z",
@@ -64,6 +66,11 @@ describe("écran de la participante", () => {
     render(<FilActiv />);
     await userEvent.type(await screen.findByLabelText("Comment veux-tu qu'on t'appelle ?"), " Camille ");
     await userEvent.click(screen.getByRole("button", { name: "Commencer" }));
+    // Itération 8 : écran de sensibilisation, case « Je m'engage » cochée
+    expect(screen.getByRole("heading", { name: "ACTIV', c'est quoi ?" })).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) await userEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(screen.getByRole("heading", { name: "Ce que L'Burn t'apporte" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Répondre aux 5 questions" }));
     await userEvent.click(screen.getByRole("button", { name: "Très basse, j'y vais tout doucement" }));
     await userEvent.click(screen.getByRole("button", { name: "Continuer" }));
     await userEvent.click(screen.getByRole("button", { name: "1 à 2 heures" }));
@@ -72,11 +79,15 @@ describe("écran de la participante", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continuer" }));
     await userEvent.click(screen.getByRole("button", { name: "Passer" }));
     await userEvent.click(screen.getByRole("button", { name: "Passer" }));
+    // Lancement impossible sans accepter les conditions d'utilisation
+    expect(screen.getByRole("button", { name: "Lancer mon parcours" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Je m'engage/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /conditions d'utilisation/ }));
     await userEvent.click(screen.getByRole("button", { name: "Lancer mon parcours" }));
     expect(await screen.findByText("Bonjour Camille")).toBeInTheDocument();
     const [url, init] = f.mock.calls[1];
     expect(url).toBe("/api/v1/moi/profil");
-    expect(JSON.parse(String(init?.body))).toEqual({ prenom: "Camille", energie: "bas", temps: 120, lieux: ["local"], envies: [], eviter: [], mot: "" });
+    expect(JSON.parse(String(init?.body))).toEqual({ prenom: "Camille", energie: "bas", temps: 120, lieux: ["local"], envies: [], eviter: [], mot: "", engagement: true, cgu: true });
     expect(screen.getByRole("status")).toHaveTextContent("C'est parti ! Sarah a reçu tes réponses.");
   });
 

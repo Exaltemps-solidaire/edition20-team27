@@ -18,6 +18,10 @@ export type Profil = {
   envies: Envie[];
   eviter: Eviter[];
   mot: string;
+  /** Case « Je m'engage » (itération 8) ; absente pour les dossiers antérieurs. */
+  engagement?: boolean;
+  /** Étapes du chemin de formation validées (tronc-commun, moderation, pair-aidance). */
+  formationsValidees?: ("tronc-commun" | "moderation" | "pair-aidance")[];
 };
 
 export type Participant = Profil & {
@@ -30,7 +34,15 @@ export type RetourMeteo = { missionId: number; titreMission: string; meteo: Mete
 
 export type SuiviParticipant = Participant & {
   id: string;
-  missions: { id: number; titre: string; statut: StatutMission }[];
+  missions: {
+    id: number;
+    titre: string;
+    statut: StatutMission;
+    // Itération 10 : missions récurrentes (facultatifs : absents = null).
+    recurrence?: { jour: string; horaire: string } | null;
+    inscriteJusquau?: string | null;
+    disponibiliteSemaine?: boolean | null;
+  }[];
   retours: RetourMeteo[];
 };
 
@@ -192,6 +204,19 @@ async function appeler<T>(chemin: string, code: string, init: RequestInit = {}):
 
 export function chargerParticipants(code: string): Promise<SuiviParticipant[]> {
   return appeler<SuiviParticipant[]>("/api/v1/accompagnante/participants", code);
+}
+
+export function validerFormation(
+  code: string,
+  id: string,
+  formation: "tronc-commun" | "moderation" | "pair-aidance",
+  validee: boolean,
+): Promise<{ ok: true; formationsValidees: ("tronc-commun" | "moderation" | "pair-aidance")[] }> {
+  return appeler(`/api/v1/accompagnante/participants/${encodeURIComponent(id)}/formations`, code, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ formation, validee }),
+  });
 }
 
 export function changerEtape(code: string, id: string, etape: number): Promise<{ ok: true }> {

@@ -1,20 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { LIBELLES_LIEU, dureeLisible } from "@/lib/activ";
-import type { MissionProposee, StatutMission } from "@/lib/api";
+import type { DureeInscription, MissionProposee, StatutMission } from "@/lib/api";
+import { DUREES_INSCRIPTION, dateLisible, questionRappel } from "@/lib/recurrence";
 
 type Props = {
   missions: MissionProposee[];
   /** Missions dont les détails de Sarah sont « en route » (effet de 1,5 s après « Je tente »). */
   enAttente: Set<number>;
-  onStatut: (id: number, statut: StatutMission) => void;
+  onStatut: (id: number, statut: StatutMission, dureeMois?: DureeInscription) => void;
+  /** Réponse au rappel hebdomadaire d'une mission récurrente (itération 10). */
+  onDisponibilite: (id: number, semaine: string, disponible: boolean) => void;
   onFaite: (id: number) => void;
   onMeteo: (id: number) => void;
   onAgenda: (m: MissionProposee) => void;
   onModifier: () => void;
 };
 
-export function Missions({ missions, enAttente, onStatut, onFaite, onMeteo, onAgenda, onModifier }: Props) {
+export function Missions({ missions, enAttente, onStatut, onDisponibilite, onFaite, onMeteo, onAgenda, onModifier }: Props) {
   return (
     <>
       <div>
@@ -30,7 +34,8 @@ export function Missions({ missions, enAttente, onStatut, onFaite, onMeteo, onAg
               key={m.id}
               mission={m}
               detailsEnRoute={enAttente.has(m.id)}
-              onStatut={(s) => onStatut(m.id, s)}
+              onStatut={(s, duree) => onStatut(m.id, s, duree)}
+              onDisponibilite={(semaine, disponible) => onDisponibilite(m.id, semaine, disponible)}
               onFaite={() => onFaite(m.id)}
               onMeteo={() => onMeteo(m.id)}
               onAgenda={() => onAgenda(m)}
@@ -49,17 +54,21 @@ function CarteMission({
   mission: m,
   detailsEnRoute,
   onStatut,
+  onDisponibilite,
   onFaite,
   onMeteo,
   onAgenda,
 }: {
   mission: MissionProposee;
   detailsEnRoute: boolean;
-  onStatut: (s: StatutMission) => void;
+  onStatut: (s: StatutMission, dureeMois?: DureeInscription) => void;
+  onDisponibilite: (semaine: string, disponible: boolean) => void;
   onFaite: () => void;
   onMeteo: () => void;
   onAgenda: () => void;
 }) {
+  const [choixDuree, setChoixDuree] = useState(false);
+  const semaine = m.rappel?.semaine ?? ""; // semaine ISO du prochain créneau, fournie par l'API
   if (m.statut === "done") {
     return (
       <div className="ok">
@@ -93,6 +102,13 @@ function CarteMission({
       <h2>{m.titre}</h2>
       <p className="m">Objectif : {m.objectif}</p>
       {m.pourquoi.length > 0 && <p className="why">Proposée pour toi : {m.pourquoi.join(" · ")}</p>}
+      {m.formation && (
+        <div className="soft">
+          <strong>Formation requise avant de commencer : {m.formation.nom}</strong>
+          <br />
+          {m.formation.chemin}
+        </div>
+      )}
     </>
   );
   if (m.statut === "yes") {
@@ -126,6 +142,36 @@ function CarteMission({
             </button>
           </div>
         )}
+        {m.recurrence && m.inscriteJusquau && (
+          <p className="m small">Inscrite jusqu&apos;au {dateLisible(m.inscriteJusquau, true)}. Tu peux arrêter quand tu veux.</p>
+        )}
+        {m.recurrence && m.rappel && (
+          <div className="soft" aria-live="polite">
+            {m.disponibiliteSemaine == null ? (
+              <>
+                <p>{questionRappel(m.recurrence.jour, m.rappel.date)}</p>
+                <div className="two">
+                  <button className="btn" onClick={() => onDisponibilite(semaine, true)}>
+                    Oui, je serai là
+                  </button>
+                  <button className="btn o" onClick={() => onDisponibilite(semaine, false)}>
+                    Pas cette semaine
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {m.disponibiliteSemaine
+                  ? `C'est noté, on se retrouve ${m.recurrence.jour} ${dateLisible(m.rappel.date)}.`
+                  : "Pas cette semaine, c'est noté. Prends soin de toi, rien à justifier."}
+                <br />
+                <button className="link" onClick={() => onDisponibilite(semaine, !m.disponibiliteSemaine)}>
+                  Changer ma réponse
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <p className="m small">Après la mission, tu pourras donner ta météo.</p>
         <div className="two">
           <button className="btn" onClick={onFaite}>
@@ -138,11 +184,39 @@ function CarteMission({
       </article>
     );
   }
+  if (m.recurrence && choixDuree) {
+    return (
+      <article className="card">
+        {entete}
+        <p>
+          Cette mission revient chaque {m.recurrence.jour} ({m.recurrence.horaire}). Pour combien de temps veux-tu t&apos;inscrire ?
+        </p>
+        <p className="m small">Sans engagement de résultat : tu peux arrêter quand tu veux.</p>
+        <div className="two">
+          {DUREES_INSCRIPTION.map((n) => (
+            <button
+              key={n}
+              className="btn"
+              onClick={() => {
+                setChoixDuree(false);
+                onStatut("yes", n);
+              }}
+            >
+              {n} mois
+            </button>
+          ))}
+        </div>
+        <button className="link" onClick={() => setChoixDuree(false)}>
+          Revenir
+        </button>
+      </article>
+    );
+  }
   return (
     <article className="card">
       {entete}
       <div className="two">
-        <button className="btn" onClick={() => onStatut("yes")}>
+        <button className="btn" onClick={() => (m.recurrence ? setChoixDuree(true) : onStatut("yes"))}>
           Je tente
         </button>
         <button className="btn o" onClick={() => onStatut("no")}>

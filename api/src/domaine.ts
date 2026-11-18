@@ -9,6 +9,9 @@ export const EVITER = ["groupe", "telephone", "ecrans", "delais"] as const;
 export const STATUTS = ["open", "yes", "no", "done"] as const;
 export const METEOS = ["soleil", "nuage", "pluie"] as const;
 export const FORMATS = ["visio", "local"] as const;
+/** Chemin de formation (passation) : tronc commun, modération, pair-aidance (option). */
+export const ETAPES_FORMATION = ["tronc-commun", "moderation", "pair-aidance"] as const;
+export type EtapeFormation = (typeof ETAPES_FORMATION)[number];
 
 export type Energie = (typeof ENERGIES)[number];
 export type Temps = (typeof TEMPS)[number];
@@ -27,12 +30,42 @@ export type Profil = {
   envies: Envie[];
   eviter: Eviter[];
   mot: string;
+  /** Case « Je m'engage » de l'écran de sensibilisation (facultative, sans pression). */
+  engagement: boolean;
+  /** Conditions d'utilisation acceptées à la fin de l'onboarding. */
+  cgu: boolean;
 };
 
-export type Participant = Profil & { etape: number; formatRdv: FormatRdv | null; lanceLe: string };
+export type Participant = Profil & {
+  etape: number;
+  formatRdv: FormatRdv | null;
+  lanceLe: string;
+  /** Étapes du chemin de formation validées par la chargée de remobilisation. */
+  formationsValidees: EtapeFormation[];
+};
 
-/** Mission telle que stockée pour une participante (le reste vient du catalogue). */
-export type MissionStockee = { id: number; statut: StatutMission; pourquoi: string[] };
+/**
+ * Mission telle que stockée pour une participante (le reste vient du catalogue).
+ * Itération 10 : `inscriteJusquau` (mission récurrente acceptée pour une durée) et `disponibilites`
+ * (réponse au rappel hebdomadaire, par semaine ISO « AAAA-Www »), tous deux facultatifs.
+ */
+export type MissionStockee = {
+  id: number;
+  statut: StatutMission;
+  pourquoi: string[];
+  inscriteJusquau?: string | null;
+  disponibilites?: Record<string, boolean>;
+};
+
+/** Formation préalable à une mission : une étape du chemin de formation (ETAPES_FORMATION). */
+export type Formation = { id: EtapeFormation; nom: string; chemin: string };
+const PAIR_AIDANCE: Formation = {
+  id: "pair-aidance", nom: "Pair-aidance", chemin: "Suis-la dans ton chemin de formation, onglet Parcours. Sarah valide chaque étape.",
+};
+export type Recurrence = { jour: string; horaire: string };
+/** Rappel hebdomadaire d'une mission récurrente : semaine ISO concernée et date (AAAA-MM-JJ) du prochain créneau. */
+export type Rappel = { semaine: string; date: string };
+export const DUREES_INSCRIPTION = [1, 3, 6] as const;
 
 /** Ce que le store garde pour une participante. Les missions sont dans l'ordre d'affichage. */
 export type Dossier = { id: string; participant: Participant; missions: MissionStockee[] };
@@ -48,6 +81,13 @@ export type MissionProposee = {
   details: [string, string][];
   pourquoi: string[];
   statut: StatutMission;
+  formation: Formation | null;
+  recurrence: Recurrence | null;
+  inscriteJusquau: string | null;
+  /** Réponse au rappel pour la semaine du prochain créneau (null : pas encore répondu). */
+  disponibiliteSemaine: boolean | null;
+  /** Rappel à afficher : mission récurrente acceptée et inscription en cours, sinon null. */
+  rappel: Rappel | null;
 };
 
 export type EtatMoi = { participant: Participant | null; missions: MissionProposee[]; meteoDeverrouillee: boolean };
@@ -56,11 +96,17 @@ export type RetourMeteo = { missionId: number; meteo: Meteo; mot: string; recuLe
 
 export type SuiviParticipant = Participant & {
   id: string;
-  missions: { id: number; titre: string; statut: StatutMission }[];
+  missions: {
+    id: number; titre: string; statut: StatutMission;
+    recurrence: Recurrence | null; inscriteJusquau: string | null; disponibiliteSemaine: boolean | null;
+  }[];
   retours: { missionId: number; titreMission: string; meteo: Meteo; mot: string; recuLe: string }[];
 };
 
-type MissionCatalogue = Omit<MissionProposee, "pourquoi" | "statut"> & { tags: string[] };
+type MissionCatalogue = Omit<
+  MissionProposee,
+  "pourquoi" | "statut" | "formation" | "recurrence" | "inscriteJusquau" | "disponibiliteSemaine" | "rappel"
+> & { tags: string[]; formation?: Formation; recurrence?: Recurrence };
 
 export const PRENOM_MAX = 40;
 export const MOT_MAX = 500;
@@ -108,6 +154,20 @@ export const CATALOGUE: readonly MissionCatalogue[] = [
     tags: ["ecrit", "creatif"], objectif: "Mettre en mots ce que tu aurais aimé entendre en arrivant.",
     details: [["Quand", "Avant fin novembre, sans urgence"], ["Où", "De chez toi, même sur papier"], ["Ton rôle", "Quelques lignes pour les futures BURN'ettes"], ["Envoi", "Une photo de ta feuille suffit"], ["Pause", "Si ça remue trop, tu peux laisser de côté"]],
   },
+  // Itérations 9 et 10 : missions tirées des retours métier (textes à valider par l'équipe).
+  {
+    id: 7, titre: "Tenir la permanence de parole du jeudi matin", duree: 120, effort: "moyen", lieu: "local", avec: "En binôme avec une pair-aidante",
+    tags: ["contact"], objectif: "Accueillir et écouter d'autres BURN'ettes, dans un cadre formé et supervisé.",
+    formation: PAIR_AIDANCE,
+    recurrence: { jour: "jeudi", horaire: "9 h 30 → 11 h 30" },
+    details: [["Quand", "Chaque jeudi, 9 h 30 → 11 h 30"], ["Où", "Au local, salle d'écoute"], ["Avec qui", "Une pair-aidante formée, toujours à tes côtés"], ["Ton rôle", "Accueillir, écouter, orienter vers l'équipe"], ["Avant", "La formation pair-aidance"], ["Pause", "Tu peux passer la main à ta binôme à tout moment"]],
+  },
+  {
+    id: 8, titre: "Écoute téléphonique", duree: 60, effort: "moyen", lieu: "chez-moi", avec: "Seule, avec un relais de l'équipe",
+    tags: ["contact", "telephone"], objectif: "Offrir une oreille attentive par téléphone, à ton heure.",
+    formation: PAIR_AIDANCE,
+    details: [["Quand", "Un créneau d'1 h par semaine, que tu choisis"], ["Où", "De chez toi"], ["Avec qui", "Une personne de l'équipe joignable pendant ton créneau"], ["Ton rôle", "Écouter, rassurer, orienter"], ["Avant", "La formation pair-aidance"], ["Pause", "Tu peux raccrocher et passer le relais à l'équipe"]],
+  },
 ];
 
 export const NB_PROPOSITIONS = 2;
@@ -151,7 +211,9 @@ export function validerProfil(corps: unknown): Profil | string {
   if (c.mot !== undefined && typeof c.mot !== "string") return "mot doit être un texte";
   const mot = ((c.mot as string | undefined) ?? "").trim();
   if (mot.length > MOT_MAX) return `mot limité à ${MOT_MAX} caractères`;
-  return { prenom, energie: c.energie, temps: c.temps, lieux, envies, eviter, mot };
+  if (c.engagement !== undefined && typeof c.engagement !== "boolean") return "engagement doit être un booléen";
+  if (c.cgu !== undefined && typeof c.cgu !== "boolean") return "cgu doit être un booléen";
+  return { prenom, energie: c.energie, temps: c.temps, lieux, envies, eviter, mot, engagement: c.engagement === true, cgu: c.cgu === true };
 }
 
 /** Valide le corps de POST /meteo. */
@@ -175,6 +237,7 @@ export function proposerMissions(profil: Profil): { id: number; pourquoi: string
     if (profil.eviter.includes("groupe") && m.tags.includes("contact")) return false;
     if (profil.eviter.includes("ecrans") && m.tags.includes("ecran")) return false;
     if (profil.eviter.includes("delais") && m.tags.includes("delai")) return false;
+    if (profil.eviter.includes("telephone") && m.tags.includes("telephone")) return false;
     return true;
   });
   const envies = (m: MissionCatalogue) => profil.envies.filter((e) => m.tags.includes(e));
@@ -213,7 +276,53 @@ export function meteoDeverrouillee(missions: MissionStockee[]): boolean {
   return missions.some((m) => m.statut === "done");
 }
 
-export function etatMoi(dossier: Dossier | null): EtatMoi {
+// --- Itération 10 : missions récurrentes, inscription pour une durée, rappel hebdomadaire ---
+
+const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const SEMAINE_ISO = /^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/;
+
+/** Semaine ISO 8601 (« AAAA-Www ») d'une date, calculée en UTC. */
+export function semaineIso(d: Date): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); // le jeudi de la même semaine porte l'année ISO
+  const annee = t.getUTCFullYear();
+  const numero = Math.ceil(((t.getTime() - Date.UTC(annee, 0, 1)) / 86_400_000 + 1) / 7);
+  return `${annee}-W${String(numero).padStart(2, "0")}`;
+}
+
+export function semaineValide(valeur: unknown): valeur is string {
+  return typeof valeur === "string" && SEMAINE_ISO.test(valeur);
+}
+
+/** Fin d'inscription à une mission récurrente : maintenant + N mois (date ISO). */
+export function finInscription(maintenant: Date, mois: number): string {
+  const d = new Date(maintenant.getTime());
+  d.setUTCMonth(d.getUTCMonth() + mois);
+  return d.toISOString();
+}
+
+/** Prochaine occurrence (aujourd'hui compris) d'un jour de la semaine, à minuit UTC ; null si jour inconnu. */
+export function prochainJour(jour: string, maintenant: Date): Date | null {
+  const cible = JOURS.indexOf(jour);
+  if (cible < 0) return null;
+  const ecart = (cible - maintenant.getUTCDay() + 7) % 7;
+  return new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth(), maintenant.getUTCDate() + ecart));
+}
+
+/** Inscription en cours : mission acceptée (`yes`) et date de fin pas encore passée. */
+export function inscriptionEnCours(m: MissionStockee, maintenant: Date): boolean {
+  return m.statut === "yes" && !!m.inscriteJusquau && new Date(m.inscriteJusquau).getTime() > maintenant.getTime();
+}
+
+/** Rappel hebdomadaire d'une mission récurrente et réponse déjà donnée pour sa semaine. */
+function rappelDe(m: MissionStockee, recurrence: Recurrence | undefined, maintenant: Date) {
+  const prochain = recurrence ? prochainJour(recurrence.jour, maintenant) : null;
+  if (!prochain || !inscriptionEnCours(m, maintenant)) return { rappel: null, disponibiliteSemaine: null };
+  const semaine = semaineIso(prochain);
+  return { rappel: { semaine, date: prochain.toISOString().slice(0, 10) }, disponibiliteSemaine: m.disponibilites?.[semaine] ?? null };
+}
+
+export function etatMoi(dossier: Dossier | null, maintenant: Date = new Date()): EtatMoi {
   if (!dossier) return { participant: null, missions: [], meteoDeverrouillee: false };
   const missions = dossier.missions.flatMap((m) => {
     const c = missionDuCatalogue(m.id);
@@ -221,17 +330,29 @@ export function etatMoi(dossier: Dossier | null): EtatMoi {
     const mission: MissionProposee = {
       id: c.id, titre: c.titre, duree: c.duree, effort: c.effort, lieu: c.lieu, avec: c.avec, objectif: c.objectif,
       details: c.details.map(([a, b]) => [a, b]), pourquoi: m.pourquoi, statut: m.statut,
+      formation: c.formation ? { ...c.formation } : null,
+      recurrence: c.recurrence ? { ...c.recurrence } : null,
+      inscriteJusquau: m.inscriteJusquau ?? null,
+      ...rappelDe(m, c.recurrence, maintenant),
     };
     return [mission];
   });
   return { participant: dossier.participant, missions, meteoDeverrouillee: meteoDeverrouillee(dossier.missions) };
 }
 
-export function suiviParticipant(dossier: Dossier, retours: RetourMeteo[]): SuiviParticipant {
+export function suiviParticipant(dossier: Dossier, retours: RetourMeteo[], maintenant: Date = new Date()): SuiviParticipant {
   return {
     ...dossier.participant,
     id: dossier.id,
-    missions: dossier.missions.map((m) => ({ id: m.id, titre: missionDuCatalogue(m.id)?.titre ?? "", statut: m.statut })),
+    missions: dossier.missions.map((m) => {
+      const c = missionDuCatalogue(m.id);
+      return {
+        id: m.id, titre: c?.titre ?? "", statut: m.statut,
+        recurrence: c?.recurrence ? { ...c.recurrence } : null,
+        inscriteJusquau: m.inscriteJusquau ?? null,
+        disponibiliteSemaine: rappelDe(m, c?.recurrence, maintenant).disponibiliteSemaine,
+      };
+    }),
     retours: [...retours]
       .sort((a, b) => b.recuLe.localeCompare(a.recuLe))
       .map((r) => ({ missionId: r.missionId, titreMission: missionDuCatalogue(r.missionId)?.titre ?? "", meteo: r.meteo, mot: r.mot, recuLe: r.recuLe })),

@@ -67,7 +67,10 @@ describe("router", () => {
     expect(suivi.corps).toEqual([
       expect.objectContaining({
         id: ID, prenom: "Camille", mot: "Bonjour Sarah", etape: 0,
-        missions: [{ id: 1, titre: "Accueillir les nouvelles à l'atelier du jeudi", statut: "done" }, { id: 3, titre: "Trier les dons de vêtements", statut: "open" }],
+        missions: [
+          expect.objectContaining({ id: 1, titre: "Accueillir les nouvelles à l'atelier du jeudi", statut: "done" }),
+          expect.objectContaining({ id: 3, titre: "Trier les dons de vêtements", statut: "open" }),
+        ],
         retours: [expect.objectContaining({ missionId: 1, titreMission: "Accueillir les nouvelles à l'atelier du jeudi", meteo: "soleil", mot: "ça m'a fait du bien" })],
       }),
     ]);
@@ -92,5 +95,56 @@ describe("router", () => {
     await appel("PUT", "/api/v1/moi/profil", profil);
     expect((await appel("DELETE", "/api/v1/moi")).corps).toMatchObject({ participant: null, missions: [] });
     expect((await appel("GET", "/api/v1/moi")).corps).toMatchObject({ participant: null });
+  });
+
+  it("inscrit à une mission récurrente pour une durée, enregistre la disponibilité, efface à l'annulation", async () => {
+    type Etat = { missions: { id: number; inscriteJusquau: string | null; rappel: { semaine: string } | null; disponibiliteSemaine: boolean | null }[] };
+    const m7 = (r: { corps?: unknown }) => (r.corps as Etat).missions.find((m) => m.id === 7)!;
+    const dispo = (corps: unknown, id = 7) => appel("POST", `/api/v1/moi/missions/${id}/disponibilite`, corps);
+
+    expect((await dispo({ semaine: "2026-W47", disponible: true })).statut).toBe(409); // pas encore lancé
+    await appel("PUT", "/api/v1/moi/profil", profil);
+    const dossier = (await store.lire(ID))!;
+    dossier.missions.push({ id: 7, statut: "open", pourquoi: [] });
+    await store.enregistrer(dossier);
+
+    expect((await appel("PUT", "/api/v1/moi/missions/7", { statut: "yes", dureeMois: 2 })).statut).toBe(400);
+    expect((await appel("PUT", "/api/v1/moi/missions/1", { statut: "yes", dureeMois: 3 })).statut).toBe(400);
+    expect((await dispo({ semaine: "2026-W47", disponible: true })).statut).toBe(409); // pas inscrite
+
+    const avant = Date.now();
+    const inscrite = await appel("PUT", "/api/v1/moi/missions/7", { statut: "yes", dureeMois: 6 });
+    expect(inscrite.statut).toBe(200);
+    const fin = new Date(m7(inscrite).inscriteJusquau!).getTime();
+    expect(fin - avant).toBeGreaterThan(180 * 86_400_000);
+    expect(fin - avant).toBeLessThan(185 * 86_400_000);
+    const semaine = m7(inscrite).rappel!.semaine;
+    expect(m7(inscrite).disponibiliteSemaine).toBeNull();
+
+    expect((await dispo({ semaine: "2026-47", disponible: true })).statut).toBe(400);
+    expect((await dispo({ semaine, disponible: "oui" })).statut).toBe(400);
+    expect((await dispo({ semaine, disponible: true }, 99)).statut).toBe(404);
+    expect((await dispo({ semaine, disponible: true })).statut).toBe(201);
+    const nonCetteSemaine = await dispo({ semaine, disponible: false });
+    expect(m7(nonCetteSemaine).disponibiliteSemaine).toBe(false); // la dernière réponse gagne
+    expect(m7(await appel("GET", "/api/v1/moi")).disponibiliteSemaine).toBe(false);
+
+    const suivi = (await sarah("GET", "/api/v1/accompagnante/participants")).corps as { missions: { id: number }[] }[];
+    expect(suivi[0].missions.find((m) => m.id === 7)).toMatchObject({ inscriteJusquau: m7(inscrite).inscriteJusquau, disponibiliteSemaine: false });
+
+    const annulee = await appel("PUT", "/api/v1/moi/missions/7", { statut: "open" });
+    expect(m7(annulee)).toMatchObject({ inscriteJusquau: null, rappel: null, disponibiliteSemaine: null });
+  });
+});
+
+describe("chemin de formation (validé par la chargée)", () => {
+  it("valide puis dévalide une étape, dans l'ordre du chemin, et refuse une étape inconnue", async () => {
+    await appel("PUT", "/api/v1/moi/profil", profil);
+    const url = `/api/v1/accompagnante/participants/${ID}/formations`;
+    expect((await sarah("PUT", url, { formation: "moderation", validee: true })).statut).toBe(200);
+    expect((await sarah("PUT", url, { formation: "tronc-commun", validee: true })).corps).toEqual({ ok: true, formationsValidees: ["tronc-commun", "moderation"] });
+    expect((await appel("GET", "/api/v1/moi")).corps).toMatchObject({ participant: { formationsValidees: ["tronc-commun", "moderation"] } });
+    expect((await sarah("PUT", url, { formation: "moderation", validee: false })).corps).toMatchObject({ formationsValidees: ["tronc-commun"] });
+    expect((await sarah("PUT", url, { formation: "sentinelle", validee: true })).statut).toBe(400);
   });
 });

@@ -18,9 +18,17 @@ export type Profil = {
   envies: Envie[];
   eviter: Eviter[];
   mot: string;
+  /** Case « Je m'engage » de l'écran de sensibilisation (facultative). */
+  engagement: boolean;
+  /** Conditions d'utilisation acceptées en fin d'onboarding. */
+  cgu: boolean;
 };
 
+export type EtapeFormation = "tronc-commun" | "moderation" | "pair-aidance";
+
 export type Participant = Profil & {
+  /** Étapes du chemin de formation validées par Sarah (absent = aucune). */
+  formationsValidees?: EtapeFormation[];
   etape: number;
   formatRdv: FormatRdv | null;
   lanceLe: string;
@@ -37,7 +45,18 @@ export type MissionProposee = {
   details: [string, string][];
   pourquoi: string[];
   statut: StatutMission;
+  // Itérations 9 et 10 (facultatifs côté front : absents = null).
+  formation?: { id: EtapeFormation; nom: string; chemin: string } | null;
+  recurrence?: Recurrence | null;
+  inscriteJusquau?: string | null;
+  /** Réponse au rappel de la semaine du prochain créneau (null : pas encore répondu). */
+  disponibiliteSemaine?: boolean | null;
+  /** Rappel hebdomadaire : semaine ISO et date (AAAA-MM-JJ) du prochain créneau, si inscription en cours. */
+  rappel?: { semaine: string; date: string } | null;
 };
+
+export type Recurrence = { jour: string; horaire: string };
+export type DureeInscription = 1 | 3 | 6;
 
 export type EtatMoi = {
   participant: Participant | null;
@@ -103,8 +122,10 @@ export const api = {
   /** Recommencer le scénario de test : efface le dossier de la persona incarnée. */
   recommencer: () => appel<EtatMoi>("/api/v1/moi", { method: "DELETE" }),
   enregistrerProfil: (profil: Profil) => appel<EtatMoi>("/api/v1/moi/profil", { method: "PUT", body: profil }),
-  changerStatut: (id: number, statut: StatutMission) =>
-    appel<EtatMoi>(`/api/v1/moi/missions/${id}`, { method: "PUT", body: { statut } }),
+  changerStatut: (id: number, statut: StatutMission, dureeMois?: DureeInscription) =>
+    appel<EtatMoi>(`/api/v1/moi/missions/${id}`, { method: "PUT", body: dureeMois ? { statut, dureeMois } : { statut } }),
+  repondreDisponibilite: (id: number, semaine: string, disponible: boolean) =>
+    appel<EtatMoi>(`/api/v1/moi/missions/${id}/disponibilite`, { method: "POST", body: { semaine, disponible } }),
   choisirFormat: (format: FormatRdv) => appel<EtatMoi>("/api/v1/moi/format", { method: "PUT", body: { format } }),
   envoyerMeteo: (missionId: number, meteo: Meteo, mot: string) =>
     appel<{ ok: true }>("/api/v1/meteo", { method: "POST", body: { missionId, meteo, ...(mot ? { mot } : {}) } }),

@@ -3,10 +3,10 @@
 // sans retirer le préfixe : les routes métier sont sous /api/v1/... ; /health et /sante à la racine.
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
-  ETAPE_MAX, FORMATS, STATUTS, etatMoi, fusionnerMissions, lireIdParticipant, proposerMissions, suiviParticipant,
-  validerProfil, validerRetour,
+  DUREES_INSCRIPTION, ETAPE_MAX, ETAPES_FORMATION, FORMATS, STATUTS, etatMoi, finInscription, fusionnerMissions, inscriptionEnCours,
+  lireIdParticipant, missionDuCatalogue, proposerMissions, semaineValide, suiviParticipant, validerProfil, validerRetour,
 } from "./domaine.ts";
-import type { Dossier, FormatRdv, StatutMission } from "./domaine.ts";
+import type { Dossier, EtapeFormation, FormatRdv, StatutMission } from "./domaine.ts";
 import type { Store } from "./store.ts";
 
 export type Requete = {
@@ -65,6 +65,7 @@ async function routesParticipante(req: Requete, chemin: string, store: Store): P
         ...profil,
         etape: actuel?.participant.etape ?? 0,
         formatRdv: actuel?.participant.formatRdv ?? null,
+        formationsValidees: actuel?.participant.formationsValidees ?? [],
         lanceLe: actuel?.participant.lanceLe ?? new Date().toISOString(),
       },
       missions: fusionnerMissions(actuel?.missions ?? [], proposerMissions(profil)),
@@ -81,9 +82,37 @@ async function routesParticipante(req: Requete, chemin: string, store: Store): P
     if (!(STATUTS as readonly unknown[]).includes(statut)) return erreur(400, "statut doit valoir open, yes, no ou done");
     const cible = dossier.missions.find((m) => m.id === Number(mission[1]));
     if (!cible) return erreur(404, "mission absente de ta liste");
+    // Itération 10 : « Je tente » sur une mission récurrente s'accompagne d'une durée d'inscription.
+    const dureeMois = champ(corps, "dureeMois");
+    if (dureeMois !== undefined) {
+      if (!(DUREES_INSCRIPTION as readonly unknown[]).includes(dureeMois)) return erreur(400, "dureeMois doit valoir 1, 3 ou 6");
+      if (statut !== "yes" || !missionDuCatalogue(cible.id)?.recurrence) {
+        return erreur(400, "dureeMois ne s'utilise qu'avec statut yes sur une mission récurrente");
+      }
+      cible.inscriteJusquau = finInscription(new Date(), dureeMois as number);
+    }
+    if (statut === "open" || statut === "no") cible.inscriteJusquau = null; // annuler efface l'inscription
     cible.statut = statut as StatutMission;
     await store.enregistrer(dossier);
     return { statut: 200, corps: etatMoi(dossier) };
+  }
+
+  const dispo = /^\/api\/v1\/moi\/missions\/(\d+)\/disponibilite$/.exec(chemin);
+  if (methode === "POST" && dispo) {
+    const semaine = champ(corps, "semaine");
+    const disponible = champ(corps, "disponible");
+    if (!semaineValide(semaine)) return erreur(400, "semaine attendue au format AAAA-Www");
+    if (typeof disponible !== "boolean") return erreur(400, "disponible doit être un booléen");
+    const dossier = await store.lire(id);
+    if (!dossier) return PAS_LANCE;
+    const cible = dossier.missions.find((m) => m.id === Number(dispo[1]));
+    if (!cible) return erreur(404, "mission absente de ta liste");
+    if (!missionDuCatalogue(cible.id)?.recurrence || !inscriptionEnCours(cible, new Date())) {
+      return erreur(409, "pas d'inscription en cours sur cette mission récurrente");
+    }
+    await store.enregistrerDisponibilite(id, cible.id, semaine, disponible);
+    cible.disponibilites = { ...cible.disponibilites, [semaine]: disponible };
+    return { statut: 201, corps: etatMoi(dossier) };
   }
 
   if (methode === "PUT" && chemin === "/api/v1/moi/format") {
@@ -122,6 +151,25 @@ async function routesAccompagnante(req: Requete, chemin: string, store: Store, c
   if (req.methode === "GET" && chemin === "/api/v1/accompagnante/participants") {
     const tous = await store.lister();
     return { statut: 200, corps: tous.map(({ dossier, retours }) => suiviParticipant(dossier, retours)) };
+  }
+
+  // Chemin de formation : la chargée valide (ou dévalide) une étape de formation.
+  const formation = /^\/api\/v1\/accompagnante\/participants\/([^/]+)\/formations$/.exec(chemin);
+  if (req.methode === "PUT" && formation) {
+    const nom = champ(req.corps, "formation");
+    const validee = champ(req.corps, "validee");
+    if (!(ETAPES_FORMATION as readonly unknown[]).includes(nom) || typeof validee !== "boolean") {
+      return erreur(400, "formation (tronc-commun, moderation, pair-aidance) et validee (booléen) attendus");
+    }
+    const id = lireIdParticipant(formation[1]);
+    const dossier = id ? await store.lire(id) : null;
+    if (!dossier) return erreur(404, "participante inconnue");
+    const actuelles = new Set(dossier.participant.formationsValidees ?? []);
+    if (validee) actuelles.add(nom as EtapeFormation);
+    else actuelles.delete(nom as EtapeFormation);
+    dossier.participant.formationsValidees = ETAPES_FORMATION.filter((f) => actuelles.has(f));
+    await store.enregistrer(dossier);
+    return { statut: 200, corps: { ok: true, formationsValidees: dossier.participant.formationsValidees } };
   }
 
   const etape = /^\/api\/v1\/accompagnante\/participants\/([^/]+)\/etape$/.exec(chemin);

@@ -8,6 +8,8 @@ export type Store = {
   /** Crée ou remplace le dossier (participante + liste ordonnée de ses missions). */
   enregistrer(dossier: Dossier): Promise<void>;
   ajouterRetour(participantId: string, retour: RetourMeteo): Promise<void>;
+  /** Réponse au rappel hebdomadaire d'une mission récurrente (une par semaine ISO, la dernière gagne). */
+  enregistrerDisponibilite(participantId: string, missionId: number, semaine: string, disponible: boolean): Promise<void>;
   /** Efface le dossier, ses missions et ses retours (recommencer le scénario de test). */
   supprimer(id: string): Promise<void>;
   /** Tous les dossiers, la participante lancée le plus récemment d'abord, avec leurs retours. */
@@ -30,6 +32,10 @@ export function creerStoreMemoire(): Store {
       const liste = retours.get(participantId) ?? [];
       liste.push({ ...retour });
       retours.set(participantId, liste);
+    },
+    async enregistrerDisponibilite(participantId, missionId, semaine, disponible) {
+      const mission = dossiers.get(participantId)?.missions.find((m) => m.id === missionId);
+      if (mission) mission.disponibilites = { ...mission.disponibilites, [semaine]: disponible };
     },
     async supprimer(id) {
       dossiers.delete(id);

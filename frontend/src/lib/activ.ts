@@ -116,9 +116,11 @@ export type Brouillon = {
   envies: string[];
   eviter: string[];
   mot: string;
+  engagement: boolean;
+  cgu: boolean;
 };
 
-export const BROUILLON_VIDE: Brouillon = { prenom: "", energie: null, temps: null, lieux: [], envies: [], eviter: [], mot: "" };
+export const BROUILLON_VIDE: Brouillon = { prenom: "", energie: null, temps: null, lieux: [], envies: [], eviter: [], mot: "", engagement: false, cgu: false };
 
 export function brouillonDepuis(p: Participant | Profil): Brouillon {
   return {
@@ -129,6 +131,8 @@ export function brouillonDepuis(p: Participant | Profil): Brouillon {
     envies: [...p.envies],
     eviter: [...p.eviter],
     mot: p.mot,
+    engagement: p.engagement ?? false,
+    cgu: p.cgu ?? false,
   };
 }
 
@@ -171,6 +175,8 @@ export function versProfil(b: Brouillon): Profil | null {
     envies: b.envies as Profil["envies"],
     eviter: b.eviter as Profil["eviter"],
     mot: b.mot.trim().slice(0, 500),
+    engagement: b.engagement,
+    cgu: b.cgu,
   };
 }
 

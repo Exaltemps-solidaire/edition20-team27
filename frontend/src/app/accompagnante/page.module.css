@@ -1,4 +1,4 @@
-/* Espace accompagnante : outil de bureau, même identité que l'appli (indigo, sauge, grège). */
+/* Espace accompagnante : outil de bureau, même identité que l'appli (palette L'Burn : rouge, prune, rose poudré). */
 
 .page {
   max-width: 1120px;
@@ -11,7 +11,7 @@
 
 .marque {
   margin: 0 0 4px;
-  font: 700 13px/1.2 var(--font-titre);
+  font: 400 13px/1.2 var(--font-titre);
   letter-spacing: 0.04em;
   color: var(--indigo);
   text-transform: uppercase;
@@ -35,7 +35,7 @@
   width: 100%;
   max-width: 420px;
   background: #fff;
-  border: 1px solid #e3e0d8;
+  border: 1px solid var(--ligne);
   border-radius: 16px;
   padding: 28px;
   display: flex;
@@ -56,7 +56,7 @@
   font: inherit;
   font-size: 16px;
   min-height: 44px;
-  border: 1px solid #c9c6bd;
+  border: 1px solid var(--ligne-forte);
   border-radius: 12px;
   padding: 8px 12px;
   background: #fff;
@@ -79,7 +79,7 @@
 }
 .confirme {
   margin: 0;
-  color: #1c4f41;
+  color: var(--sauge-fonce);
   font-size: 14px;
   font-weight: 600;
 }
@@ -109,7 +109,7 @@
 }
 .chiffre {
   background: #fff;
-  border: 1px solid #e3e0d8;
+  border: 1px solid var(--ligne);
   border-radius: 16px;
   padding: 16px 20px;
   display: flex;
@@ -117,7 +117,7 @@
   gap: 14px;
 }
 .chiffre b {
-  font: 700 34px/1 var(--font-titre);
+  font: 400 34px/1 var(--font-titre);
   color: var(--indigo);
 }
 .chiffre span {
@@ -155,7 +155,7 @@
 }
 .carte {
   background: #fff;
-  border: 1px solid #e3e0d8;
+  border: 1px solid var(--ligne);
   border-radius: 16px;
   padding: 20px 24px;
   display: flex;
@@ -174,7 +174,7 @@
 }
 .prenom {
   margin: 0;
-  font: 700 22px/1.2 var(--font-titre);
+  font: 400 22px/1.2 var(--font-titre);
 }
 .badgeAlerte {
   display: inline-block;
@@ -196,8 +196,8 @@
   grid-template-columns: auto minmax(220px, 340px) 1fr;
   align-items: center;
   gap: 8px 12px;
-  background: #f4f4fd;
-  border: 1px solid #d9daf6;
+  background: var(--indigo-voile);
+  border: 1px solid var(--indigo-ligne);
   border-radius: 12px;
   padding: 10px 14px;
 }
@@ -215,7 +215,7 @@
 
 .sousTitre {
   margin: 4px 0 6px;
-  font: 700 14px/1.3 var(--font-titre);
+  font: 400 14px/1.3 var(--font-titre);
   color: var(--sauge);
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -229,7 +229,7 @@
   margin: 0;
   padding: 10px 14px;
   border-left: 4px solid var(--indigo);
-  background: #f4f4fd;
+  background: var(--indigo-voile);
   border-radius: 0 12px 12px 0;
   font-size: 15px;
   white-space: pre-wrap;
@@ -258,21 +258,21 @@
   white-space: nowrap;
 }
 .statutOpen {
-  background: #f1eee6;
-  color: #4a4e5e;
+  background: var(--doux);
+  color: var(--mut-fonce);
 }
 .statutYes {
-  background: #e8e9fb;
-  color: #2f33a8;
+  background: var(--indigo-clair);
+  color: var(--indigo-fonce);
 }
 .statutNo {
-  background: #f1eee6;
-  color: #5a5f70;
+  background: var(--doux);
+  color: var(--mut);
   font-style: italic;
 }
 .statutDone {
-  background: #e2f1ec;
-  color: #22604f;
+  background: var(--sauge-clair);
+  color: var(--sauge-fonce);
 }
 
 .retours {
@@ -289,7 +289,7 @@
   align-items: flex-start;
   padding: 10px 12px;
   border-radius: 12px;
-  background: #f6f4ef;
+  background: var(--surface);
 }
 .retourPluie {
   background: #fff4e5;
@@ -320,3 +320,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Chemin de formation validé par Sarah */
+.formations { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.formations label { display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; }

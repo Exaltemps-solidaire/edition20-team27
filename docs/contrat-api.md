@@ -33,6 +33,7 @@ type Profil = {
   envies: Envie[];         // 0 ou plus
   eviter: Eviter[];        // 0 ou plus
   mot: string;             // 0 à 500 caractères, pour Sarah
+  engagement?: boolean;     // case « Je m'engage » (itération 8), facultative ; absente = false
 };
 
 type Participant = Profil & {
@@ -52,6 +53,13 @@ type MissionProposee = {
   details: [string, string][];
   pourquoi: string[];      // ex. ["au local", "tient dans ton temps", "effort léger", "être avec d'autres personnes"]
   statut: StatutMission;
+  // Itération 9 : formation préalable (étape du chemin de formation), sinon null
+  formation: { id: "tronc-commun" | "moderation" | "pair-aidance"; nom: string; chemin: string } | null;
+  // Itération 10 : mission récurrente
+  recurrence: { jour: string; horaire: string } | null;   // ex. { jour: "jeudi", horaire: "9 h 30 → 11 h 30" }
+  inscriteJusquau: string | null;        // ISO ; posée par « Je tente » avec dureeMois, effacée par open/no
+  disponibiliteSemaine: boolean | null;  // réponse au rappel pour la semaine ISO du prochain créneau ; null = pas encore répondu
+  rappel: { semaine: string; date: string } | null; // "AAAA-Www" et "AAAA-MM-JJ" du prochain créneau, si statut yes et inscription en cours
 };
 
 type EtatMoi = {
@@ -68,17 +76,18 @@ type EtatMoi = {
 | GET | `/api/v1/moi` | — | `200 EtatMoi` |
 | DELETE | `/api/v1/moi` | — | `200 EtatMoi` vide : recommence le scénario de test (efface dossier, missions, retours) |
 | PUT | `/api/v1/moi/profil` | `Profil` | `200 EtatMoi` (crée ou met à jour, recalcule les propositions) ; `400` si invalide |
-| PUT | `/api/v1/moi/missions/:id` | `{ statut: StatutMission }` | `200 EtatMoi` ; `404` si la mission n'est pas dans sa liste ; `409` si pas encore lancé |
+| PUT | `/api/v1/moi/missions/:id` | `{ statut: StatutMission, dureeMois?: 1 \| 3 \| 6 }` | `200 EtatMoi` ; `404` si la mission n'est pas dans sa liste ; `409` si pas encore lancé ; `400` si `dureeMois` invalide ou utilisé hors `statut: "yes"` sur mission récurrente. `inscriteJusquau` = maintenant + `dureeMois` mois ; `open`/`no` effacent l'inscription |
+| POST | `/api/v1/moi/missions/:id/disponibilite` | `{ semaine: "AAAA-Www", disponible: boolean }` | `201 EtatMoi` (une réponse par semaine ISO, la dernière gagne) ; `400` si invalide ; `409` si pas encore lancé ou pas d'inscription en cours sur cette mission récurrente ; `404` si la mission n'est pas dans sa liste |
 | PUT | `/api/v1/moi/format` | `{ format: FormatRdv }` | `200 EtatMoi` ; `409` si pas encore lancé |
 | POST | `/api/v1/meteo` | `{ missionId: number, meteo: Meteo, mot?: string }` | `201 { ok: true }` ; `400` si invalide ; `409` si la mission n'est pas `done` pour cette participante |
 
 ### Propositions de missions (règle métier)
 
-Catalogue fixe de 6 missions (ids 1 à 6, textes de la maquette). Une mission est **éligible** si :
+Catalogue fixe de 8 missions (ids 1 à 6, textes de la maquette ; 7 « permanence de parole du jeudi matin », récurrente, et 8 « écoute téléphonique », tirées des retours métier, formation Pair-aidance requise). Une mission est **éligible** si :
 - son lieu est dans `lieux` ;
 - sa durée ≤ `temps` ;
 - si `energie = "bas"` : effort `léger` **et** durée ≤ 60 ;
-- si `eviter` contient `groupe` : pas de tag `contact` ; `ecrans` : pas de tag `ecran` ; `delais` : pas de tag `delai`.
+- si `eviter` contient `groupe` : pas de tag `contact` ; `ecrans` : pas de tag `ecran` ; `delais` : pas de tag `delai` ; `telephone` : pas de tag `telephone`.
 
 Score = nombre de tags dans `envies`. Tri : score décroissant, puis durée croissante. On propose les **2 premières**.
 `pourquoi` = [lieu en minuscules, "tient dans ton temps", ("effort léger" si énergie basse), libellés des envies correspondantes en minuscules].
@@ -98,7 +107,10 @@ Pour la version de test du PRD (« pas de connexion »), la variable **`ACCOMPAG
 ```ts
 type SuiviParticipant = Participant & {
   id: string;
-  missions: { id: number; titre: string; statut: StatutMission }[];
+  missions: {
+    id: number; titre: string; statut: StatutMission;
+    recurrence: { jour: string; horaire: string } | null; inscriteJusquau: string | null; disponibiliteSemaine: boolean | null;
+  }[];
   retours: { missionId: number; titreMission: string; meteo: Meteo; mot: string; recuLe: string }[]; // plus récent d'abord
 };
 ```

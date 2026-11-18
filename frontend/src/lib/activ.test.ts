@@ -50,7 +50,7 @@ describe("questionnaire", () => {
 
   it("ne produit un profil que s'il est complet, avec prénom nettoyé et temps numérique", () => {
     const b = { ...BROUILLON_VIDE, prenom: "  Camille ", energie: "bas", temps: "120", lieux: ["local"] };
-    expect(versProfil(b)).toEqual({ prenom: "Camille", energie: "bas", temps: 120, lieux: ["local"], envies: [], eviter: [], mot: "" });
+    expect(versProfil(b)).toEqual({ prenom: "Camille", energie: "bas", temps: 120, lieux: ["local"], envies: [], eviter: [], mot: "", engagement: false, cgu: false });
     expect(versProfil({ ...b, prenom: "   " })).toBeNull();
     expect(versProfil({ ...b, lieux: [] })).toBeNull();
   });

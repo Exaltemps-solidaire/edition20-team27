@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { dateLisible, libelleDisponibilite } from "@/lib/recurrence";
 import {
   CLE_SESSION_CODE,
   ETAPES_PARCOURS,
@@ -28,6 +29,8 @@ import {
   type SuiviParticipant,
 } from "@/lib/accompagnante";
 import { ecrirePersona } from "@/lib/personas";
+import { CHEMIN_FORMATION } from "@/lib/formation";
+import { validerFormation } from "@/lib/accompagnante";
 import styles from "./page.module.css";
 
 /** Jeton envoyé quand l'API est en accès libre (PRD : pas de connexion) ; ignoré par le serveur dans ce mode. */
@@ -299,6 +302,7 @@ export default function Accompagnante() {
                 p={p}
                 maintenant={maintenant}
                 etat={etats[p.id]}
+                code={code}
                 onEtape={(etape) => void modifierEtape(p, etape)}
               />
             ))}
@@ -313,11 +317,13 @@ function CarteParticipante({
   p,
   maintenant,
   etat,
+  code,
   onEtape,
 }: {
   p: SuiviParticipant;
   maintenant: Date;
   etat: EtatEtape | undefined;
+  code: string;
   onEtape: (etape: number) => void;
 }) {
   const aRecontacter = pluiesRecentes(p, maintenant) > 0;
@@ -373,8 +379,14 @@ function CarteParticipante({
             <dd>{p.envies.map((x) => libelle(LIBELLES_ENVIE, x)).join(", ") || "Pas encore précisé"}</dd>
             <dt>À éviter</dt>
             <dd>{p.eviter.map((x) => libelle(LIBELLES_EVITER, x)).join(", ") || "Rien de signalé"}</dd>
+            <dt>Engagement</dt>
+            <dd>{p.engagement ? "S'est engagée à respecter ses missions" : "Case pas cochée"}</dd>
             <dt>Format de RDV</dt>
             <dd>{p.formatRdv ? libelle(LIBELLES_FORMAT, p.formatRdv) : "Pas encore choisi"}</dd>
+            <dt>Formation</dt>
+            <dd>
+              <FormationsValidees p={p} code={code} />
+            </dd>
           </dl>
         </section>
 
@@ -393,7 +405,15 @@ function CarteParticipante({
             <ul className={styles.missions}>
               {p.missions.map((m) => (
                 <li key={m.id}>
-                  <span>{m.titre}</span>
+                  <span>
+                    {m.titre}
+                    {m.recurrence && m.inscriteJusquau && (
+                      <small className="m small">
+                        <br />
+                        Inscrite jusqu&apos;au {dateLisible(m.inscriteJusquau, true)} · cette semaine : {libelleDisponibilite(m.disponibiliteSemaine)}
+                      </small>
+                    )}
+                  </span>
                   <span className={`${styles.statut} ${CLASSE_STATUT[m.statut] ?? ""}`}>{libelle(LIBELLES_STATUT, m.statut)}</span>
                 </li>
               ))}
@@ -430,5 +450,42 @@ function CarteParticipante({
         )}
       </section>
     </li>
+  );
+}
+
+type IdFormation = "tronc-commun" | "moderation" | "pair-aidance";
+
+/** Chemin de formation : Sarah valide chaque étape ; la participante la voit dans son Parcours. */
+function FormationsValidees({ p, code }: { p: SuiviParticipant; code: string }) {
+  const [validees, setValidees] = useState<IdFormation[]>(p.formationsValidees ?? []);
+  const [message, setMessage] = useState("");
+
+  async function basculer(id: IdFormation, validee: boolean) {
+    const avant = validees;
+    setValidees(validee ? [...validees, id] : validees.filter((x) => x !== id));
+    try {
+      const r = await validerFormation(code, p.id, id, validee);
+      setValidees(r.formationsValidees);
+      setMessage(validee ? "Étape validée." : "Validation retirée.");
+    } catch {
+      setValidees(avant);
+      setMessage("Ça n'a pas marché, réessaie.");
+    }
+  }
+
+  return (
+    <fieldset className={styles.formations}>
+      <legend className={styles.srOnly}>Formations validées pour {p.prenom}</legend>
+      {CHEMIN_FORMATION.map((e) => (
+        <label key={e.id}>
+          <input type="checkbox" checked={validees.includes(e.id)} onChange={(ev) => void basculer(e.id, ev.target.checked)} />{" "}
+          {e.titre}
+          {e.option ? " (option)" : ""}
+        </label>
+      ))}
+      <span role="status" className="auteur">
+        {message}
+      </span>
+    </fieldset>
   );
 }

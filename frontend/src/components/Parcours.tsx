@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ETAPES, LIBELLES, LIBELLES_ETAPE, statutEtape, texteHero } from "@/lib/activ";
 import type { Participant } from "@/lib/api";
+import { CheminFormation } from "./CheminFormation";
 import { Coche } from "./Icones";
 
 type Props = {
@@ -52,6 +53,7 @@ export function Parcours({ participant: p, restantes, onVoirMissions, onModifier
           );
         })}
       </ol>
+      <CheminFormation validees={p.formationsValidees} />
       <div className="card">
         <h2 className="h-card">Ton point de départ</h2>
         <div className="tags">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BROUILLON_VIDE, avecStatut, brouillonDepuis, missionPourMeteo, missionsAChoisir } from "@/lib/activ";
-import { api, type EtatMoi, type FormatRdv, type Meteo, type MissionProposee, type Profil, type StatutMission } from "@/lib/api";
+import { api, type DureeInscription, type EtatMoi, type FormatRdv, type Meteo, type MissionProposee, type Profil, type StatutMission } from "@/lib/api";
 import { ATELIER_COLLECTIF, creneauDepuisDetails, genererIcs } from "@/lib/ics";
 import { telechargerFichier } from "@/lib/telecharger";
 import { Infos } from "@/components/Infos";
@@ -96,7 +96,7 @@ export function AppParticipante({ bandeau }: { bandeau?: ReactNode }) {
     afficherToast(encore ? "Tes réponses sont à jour. Tes missions ont été ajustées." : "C'est parti ! Sarah a reçu tes réponses.");
   }
 
-  function changerStatut(id: number, statut: StatutMission) {
+  function changerStatut(id: number, statut: StatutMission, dureeMois?: DureeInscription) {
     if (!etat) return;
     setEnAttente((s) => {
       const n = new Set(s);
@@ -116,7 +116,14 @@ export function AppParticipante({ bandeau }: { bandeau?: ReactNode }) {
         }, 1500),
       );
     }
-    void muter(avecStatut(etat, id, statut), () => api.changerStatut(id, statut));
+    void muter(avecStatut(etat, id, statut), () => api.changerStatut(id, statut, dureeMois));
+  }
+
+  /** Rappel hebdomadaire d'une mission récurrente (itération 10) : aucune justification demandée. */
+  async function repondreDisponibilite(id: number, semaine: string, disponible: boolean) {
+    if (await muter(null, () => api.repondreDisponibilite(id, semaine, disponible))) {
+      afficherToast(disponible ? "Merci, c'est noté !" : "C'est noté. Prends soin de toi cette semaine.");
+    }
   }
 
   function missionFaite(id: number) {
@@ -222,6 +229,7 @@ export function AppParticipante({ bandeau }: { bandeau?: ReactNode }) {
               missions={missions}
               enAttente={enAttente}
               onStatut={changerStatut}
+              onDisponibilite={(id, semaine, disponible) => void repondreDisponibilite(id, semaine, disponible)}
               onFaite={missionFaite}
               onMeteo={donnerMeteo}
               onAgenda={agendaMission}
