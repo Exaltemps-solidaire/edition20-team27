@@ -13,5 +13,14 @@ services:
     networks: [core-network]
     ports: ["8081:8081"]
     restart: unless-stopped
+    # Les secrets (DB_PASSWORD, ACCOMPAGNANTE_CODE) viennent de l'environnement du shell qui lance
+    # le compose, chargé depuis /srv/team27/team27.env, hors du dépôt (voir DEPLOIEMENT.md).
     environment:
       PORT: "8081"
+      DB_HOST: postgres.internal
+      DB_PORT: "5432"
+      DB_NAME: team27
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      ACCOMPAGNANTE_CODE: ${ACCOMPAGNANTE_CODE:-}
+      ACCOMPAGNANTE_ACCES_LIBRE: ${ACCOMPAGNANTE_ACCES_LIBRE:-0}

@@ -8,5 +8,11 @@
   },
   "scripts": {
     "start": "node src/server.ts"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
   }
 }

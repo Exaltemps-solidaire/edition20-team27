@@ -1,42 +1,154 @@
-// Routage de l'API, sans dépendance : une fonction pure, testable sans démarrer de serveur.
-// Le proxy d'entrée envoie /api/... à ce service sans retirer le préfixe : les routes métier
-// se déclarent donc sous /api/v1/... ; /health et /sante restent à la racine (port 8081).
+// Routage de l'API (voir docs/contrat-api.md), testable sans démarrer de serveur : il reçoit la
+// requête déjà lue, le store et la configuration. Le proxy d'entrée envoie /api/... à ce service
+// sans retirer le préfixe : les routes métier sont sous /api/v1/... ; /health et /sante à la racine.
+import { createHash, timingSafeEqual } from "node:crypto";
+import {
+  ETAPE_MAX, FORMATS, STATUTS, etatMoi, fusionnerMissions, lireIdParticipant, proposerMissions, suiviParticipant,
+  validerProfil, validerRetour,
+} from "./domaine.ts";
+import type { Dossier, FormatRdv, StatutMission } from "./domaine.ts";
+import type { Store } from "./store.ts";
 
+export type Requete = {
+  methode: string;
+  url: string;
+  entetes: Record<string, string | string[] | undefined>;
+  corps?: unknown;
+};
 export type Reponse = { statut: number; corps?: unknown };
+export type Config = { accompagnanteCode?: string; accesLibre?: boolean };
 
-const METEOS = ["soleil", "nuage", "pluie"] as const;
-export type Meteo = (typeof METEOS)[number];
-export type RetourMeteo = { missionId: number; meteo: Meteo; mot: string; recuLe: string };
+const erreur = (statut: number, message: string): Reponse => ({ statut, corps: { erreur: message } });
+const PAS_LANCE = erreur(409, "questionnaire pas encore lancé");
 
-export const MOT_MAX = 500;
-const RETOURS_MAX = 1000;
-
-// Stockage en mémoire (voir adr.md) : perdu au redémarrage du conteneur.
-export const retours: RetourMeteo[] = [];
-
-/** Valide le corps d'un retour météo. Renvoie le retour nettoyé, ou un message d'erreur. */
-export function validerRetour(corps: unknown): Omit<RetourMeteo, "recuLe"> | string {
-  if (typeof corps !== "object" || corps === null) return "corps JSON attendu";
-  const { missionId, meteo, mot } = corps as Record<string, unknown>;
-  if (!Number.isInteger(missionId) || (missionId as number) <= 0) return "missionId invalide";
-  if (typeof meteo !== "string" || !(METEOS as readonly string[]).includes(meteo)) return "meteo doit valoir soleil, nuage ou pluie";
-  if (mot !== undefined && typeof mot !== "string") return "mot doit être un texte";
-  const texte = (mot ?? "").trim();
-  if (texte.length > MOT_MAX) return `mot limité à ${MOT_MAX} caractères`;
-  return { missionId: missionId as number, meteo: meteo as Meteo, mot: texte };
+function entete(req: Requete, nom: string): string | undefined {
+  const v = req.entetes[nom];
+  return Array.isArray(v) ? v[0] : v;
 }
 
-export function router(methode: string, url: string, corps?: unknown): Reponse {
-  const chemin = new URL(url, "http://api").pathname;
-  if (methode === "GET" && (chemin === "/health" || chemin === "/sante")) {
-    return { statut: 200, corps: { status: "ok" } };
+function champ(corps: unknown, nom: string): unknown {
+  return typeof corps === "object" && corps !== null ? (corps as Record<string, unknown>)[nom] : undefined;
+}
+
+// Comparaison en temps constant : on compare des empreintes de même longueur.
+function codeValide(fourni: string, attendu: string): boolean {
+  const a = createHash("sha256").update(fourni).digest();
+  const b = createHash("sha256").update(attendu).digest();
+  return timingSafeEqual(a, b);
+}
+
+async function routesParticipante(req: Requete, chemin: string, store: Store): Promise<Reponse | null> {
+  const estMoi = chemin === "/api/v1/moi" || chemin.startsWith("/api/v1/moi/");
+  if (!estMoi && chemin !== "/api/v1/meteo") return null;
+
+  const id = lireIdParticipant(entete(req, "x-participant"));
+  if (!id) return erreur(400, "en-tête X-Participant manquant ou invalide (UUID attendu)");
+  const { methode, corps } = req;
+
+  if (methode === "GET" && chemin === "/api/v1/moi") {
+    return { statut: 200, corps: etatMoi(await store.lire(id)) };
   }
+
+  // Recommencer le scénario de test : efface le dossier de cette persona et ses retours.
+  if (methode === "DELETE" && chemin === "/api/v1/moi") {
+    await store.supprimer(id);
+    return { statut: 200, corps: etatMoi(null) };
+  }
+
+  if (methode === "PUT" && chemin === "/api/v1/moi/profil") {
+    const profil = validerProfil(corps);
+    if (typeof profil === "string") return erreur(400, profil);
+    const actuel = await store.lire(id);
+    const dossier: Dossier = {
+      id,
+      participant: {
+        ...profil,
+        etape: actuel?.participant.etape ?? 0,
+        formatRdv: actuel?.participant.formatRdv ?? null,
+        lanceLe: actuel?.participant.lanceLe ?? new Date().toISOString(),
+      },
+      missions: fusionnerMissions(actuel?.missions ?? [], proposerMissions(profil)),
+    };
+    await store.enregistrer(dossier);
+    return { statut: 200, corps: etatMoi(dossier) };
+  }
+
+  const mission = /^\/api\/v1\/moi\/missions\/(\d+)$/.exec(chemin);
+  if (methode === "PUT" && mission) {
+    const dossier = await store.lire(id);
+    if (!dossier) return PAS_LANCE;
+    const statut = champ(corps, "statut");
+    if (!(STATUTS as readonly unknown[]).includes(statut)) return erreur(400, "statut doit valoir open, yes, no ou done");
+    const cible = dossier.missions.find((m) => m.id === Number(mission[1]));
+    if (!cible) return erreur(404, "mission absente de ta liste");
+    cible.statut = statut as StatutMission;
+    await store.enregistrer(dossier);
+    return { statut: 200, corps: etatMoi(dossier) };
+  }
+
+  if (methode === "PUT" && chemin === "/api/v1/moi/format") {
+    const dossier = await store.lire(id);
+    if (!dossier) return PAS_LANCE;
+    const format = champ(corps, "format");
+    if (!(FORMATS as readonly unknown[]).includes(format)) return erreur(400, "format doit valoir visio ou local");
+    dossier.participant.formatRdv = format as FormatRdv;
+    await store.enregistrer(dossier);
+    return { statut: 200, corps: etatMoi(dossier) };
+  }
+
   if (methode === "POST" && chemin === "/api/v1/meteo") {
     const retour = validerRetour(corps);
-    if (typeof retour === "string") return { statut: 400, corps: { erreur: retour } };
-    if (retours.length >= RETOURS_MAX) retours.shift();
-    retours.push({ ...retour, recuLe: new Date().toISOString() });
+    if (typeof retour === "string") return erreur(400, retour);
+    const dossier = await store.lire(id);
+    const faite = dossier?.missions.some((m) => m.id === retour.missionId && m.statut === "done");
+    if (!faite) return erreur(409, "la mission n'est pas terminée");
+    await store.ajouterRetour(id, { ...retour, recuLe: new Date().toISOString() });
     return { statut: 201, corps: { ok: true } };
   }
+
   return { statut: 404 };
+}
+
+async function routesAccompagnante(req: Requete, chemin: string, store: Store, config: Config): Promise<Reponse | null> {
+  if (!chemin.startsWith("/api/v1/accompagnante/")) return null;
+  // Fermé par défaut. Le PRD de la version de test demande « pas de connexion » (écran « Qui êtes-vous ? ») :
+  // ce mode s'active explicitement avec ACCOMPAGNANTE_ACCES_LIBRE=1, réservé aux données d'exemple.
+  if (!config.accesLibre) {
+    if (!config.accompagnanteCode) return erreur(503, "accès accompagnante non configuré");
+    const auth = /^Bearer (.+)$/.exec(entete(req, "authorization") ?? "");
+    if (!auth || !codeValide(auth[1], config.accompagnanteCode)) return erreur(401, "code accompagnante invalide");
+  }
+
+  if (req.methode === "GET" && chemin === "/api/v1/accompagnante/participants") {
+    const tous = await store.lister();
+    return { statut: 200, corps: tous.map(({ dossier, retours }) => suiviParticipant(dossier, retours)) };
+  }
+
+  const etape = /^\/api\/v1\/accompagnante\/participants\/([^/]+)\/etape$/.exec(chemin);
+  if (req.methode === "PUT" && etape) {
+    const valeur = champ(req.corps, "etape");
+    if (!Number.isInteger(valeur) || (valeur as number) < 0 || (valeur as number) > ETAPE_MAX) {
+      return erreur(400, `etape doit être un entier de 0 à ${ETAPE_MAX}`);
+    }
+    const id = lireIdParticipant(etape[1]);
+    const dossier = id ? await store.lire(id) : null;
+    if (!dossier) return erreur(404, "participante inconnue");
+    dossier.participant.etape = valeur as number;
+    await store.enregistrer(dossier);
+    return { statut: 200, corps: { ok: true } };
+  }
+
+  return { statut: 404 };
+}
+
+export async function router(req: Requete, store: Store, config: Config): Promise<Reponse> {
+  const chemin = new URL(req.url, "http://api").pathname;
+  if (req.methode === "GET" && (chemin === "/health" || chemin === "/sante")) {
+    return { statut: 200, corps: { status: "ok" } };
+  }
+  return (
+    (await routesParticipante(req, chemin, store)) ??
+    (await routesAccompagnante(req, chemin, store, config)) ??
+    { statut: 404 }
+  );
 }
