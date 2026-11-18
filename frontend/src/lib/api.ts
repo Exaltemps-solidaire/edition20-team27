@@ -88,10 +88,10 @@ export function nouvelUuid(c: Pick<Crypto, "getRandomValues"> & { randomUUID?: (
 
 /**
  * Identifiant de la participante envoyé dans X-Participant. PRD : pas de connexion, on incarne une
- * persona choisie sur l'écran « Qui êtes-vous ? » ; son identifiant est fixe (voir lib/personas.ts).
+ * persona choisie sur l'écran « Qui êtes-vous ? » ; une BURN'ette par appareil (voir lib/personas.ts).
  */
-export function identifiantParticipant(stockage?: Pick<Storage, "getItem"> | null): string {
-  const id = participantIdCourant(stockage);
+export function identifiantParticipant(stockage?: Pick<Storage, "getItem" | "setItem"> | null): string {
+  const id = participantIdCourant(stockage ?? undefined);
   return UUID.test(id) ? id : nouvelUuid();
 }
 

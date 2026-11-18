@@ -17,13 +17,16 @@ import {
   changerEtape,
   chargerParticipants,
   compterPluiesRecentes,
+  compterSurEngagements,
   estPluieRecente,
   formaterDate,
   libelle,
   libelleEtape,
   messageErreur,
   pluiesRecentes,
+  pourcentageCharge,
   trierParticipants,
+  type Charge,
   type Meteo,
   type StatutMission,
   type SuiviParticipant,
@@ -229,6 +232,7 @@ export default function Accompagnante() {
 
   const triees = participants ? trierParticipants(participants, maintenant) : [];
   const nbPluies = participants ? compterPluiesRecentes(participants, maintenant) : 0;
+  const nbSurEngagements = participants ? compterSurEngagements(participants) : 0;
 
   return (
     <main className={styles.page}>
@@ -279,6 +283,12 @@ export default function Accompagnante() {
             <span>
               {nbPluies > 1 ? "retours « C'était trop » à traiter" : "retour « C'était trop » à traiter"}
               <small> (moins de 14 jours)</small>
+            </span>
+          </div>
+          <div className={`${styles.chiffre} ${nbSurEngagements > 0 ? styles.chiffreAlerte : ""}`}>
+            <b>{nbSurEngagements}</b>
+            <span>
+              {nbSurEngagements > 1 ? "BURN'ettes engagées au-delà de leur temps" : "BURN'ette engagée au-delà de son temps"}
             </span>
           </div>
         </section>
@@ -339,8 +349,15 @@ function CarteParticipante({
           </h3>
           <p className="m small">Parcours lancé {formaterDate(p.lanceLe, maintenant)}</p>
         </div>
-        {aRecontacter && <span className={styles.badgeAlerte}>À recontacter</span>}
+        {(aRecontacter || p.charge?.surEngagement) && (
+          <div className={styles.badges}>
+            {aRecontacter && <span className={styles.badgeAlerte}>À recontacter</span>}
+            {p.charge?.surEngagement && <span className={styles.badgeAlerte}>Au-delà de son temps</span>}
+          </div>
+        )}
       </div>
+
+      {p.charge && <JaugeCharge charge={p.charge} />}
 
       <div className={styles.etape}>
         <label htmlFor={idSelect}>Étape actuelle</label>
@@ -487,5 +504,31 @@ function FormationsValidees({ p, code }: { p: SuiviParticipant; code: string }) 
         {message}
       </span>
     </fieldset>
+  );
+}
+
+/** Jauge douce : minutes engagées par semaine sur le temps qu'elle a dit pouvoir donner. */
+function JaugeCharge({ charge }: { charge: Charge }) {
+  const fin = new Date(charge.finEngagement);
+  return (
+    <div className={styles.charge}>
+      <p className={styles.chargeTexte}>
+        <b>{charge.minutesEngagees} min engagées</b> / {charge.minutesDisponibles} min par semaine
+      </p>
+      <div className={styles.jauge} aria-hidden="true">
+        <div
+          className={`${styles.jaugeRemplie} ${charge.surEngagement ? styles.jaugeAuDela : ""}`}
+          style={{ width: `${pourcentageCharge(charge)}%` }}
+        />
+      </div>
+      {charge.surEngagement && (
+        <p className={styles.chargeConseil}>Propose-lui d&apos;alléger : une pause est toujours possible.</p>
+      )}
+      {!Number.isNaN(fin.getTime()) && (
+        <p className="m small">
+          Engagement jusqu&apos;au {fin.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} (un an au plus)
+        </p>
+      )}
+    </div>
   );
 }

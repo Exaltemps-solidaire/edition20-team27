@@ -100,7 +100,7 @@ dd { margin: 0; }
 .wx { background: #fff; border: 1px solid var(--ligne); border-radius: 16px; padding: 16px 4px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 116px; cursor: pointer; }
 .wx[aria-pressed="true"] { background: var(--indigo-clair); border: 2px solid var(--indigo); }
 label { font-size: 14px; font-weight: 600; }
-textarea { font: inherit; font-size: 16px; border: 1px solid var(--ligne-forte); border-radius: 12px; padding: 12px; background: #fff; color: var(--ink); resize: none; width: 100%; }
+textarea { flex: none; min-height: 76px; font: inherit; font-size: 16px; border: 1px solid var(--ligne-forte); border-radius: 12px; padding: 12px; background: #fff; color: var(--ink); resize: none; width: 100%; }
 .centre { display: flex; flex-direction: column; gap: 14px; padding-top: 40px; text-align: center; align-items: center; }
 
 nav { display: grid; grid-template-columns: repeat(4, 1fr); background: #fff; border-top: 1px solid var(--ligne); padding: 6px 6px 14px; }

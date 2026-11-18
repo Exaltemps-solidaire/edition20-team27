@@ -10,10 +10,12 @@ describe("identifiant de la participante", () => {
     expect(nouvelUuid(sansRandomUuid)).toMatch(UUID_V4);
   });
 
-  it("envoie l'identifiant fixe de la persona incarnée (écran « Qui êtes-vous ? »)", () => {
+  it("garde le même identifiant de BURN'ette sur cet appareil (une Camille par testeur)", () => {
     localStorage.setItem("filactiv.persona", "camille");
+    localStorage.removeItem("filactiv.participant");
     const id = identifiantParticipant();
-    expect(id).toBe(PERSONAS[0].participantId);
+    expect(id).toMatch(UUID_V4);
+    expect(id).not.toBe(PERSONAS[0].participantId);
     expect(identifiantParticipant()).toBe(id);
   });
 });

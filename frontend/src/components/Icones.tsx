@@ -77,7 +77,7 @@ export function CheminEtapes() {
     <svg viewBox="0 0 300 120" width="100%" height="120" role="img" aria-label="Un chemin en 5 étapes">
       <path d="M20 95 C 80 95, 90 30, 150 50 S 230 100, 280 25" fill="none" stroke="#D6D3CA" strokeWidth="6" strokeLinecap="round" strokeDasharray="2 14" />
       {POINTS.map(([x, y], i) => (
-        <circle key={x} cx={x} cy={y} r={i ? 9 : 13} fill={i ? "#fff" : "#4347D9"} stroke={i ? "#9EA2B3" : "#fff"} strokeWidth="3" />
+        <circle key={x} cx={x} cy={y} r={i ? 9 : 13} fill={i ? "#fff" : "#C42B24"} stroke={i ? "#9EA2B3" : "#fff"} strokeWidth="3" />
       ))}
     </svg>
   );

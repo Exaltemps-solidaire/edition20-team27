@@ -101,7 +101,11 @@ export type SuiviParticipant = Participant & {
     recurrence: Recurrence | null; inscriteJusquau: string | null; disponibiliteSemaine: boolean | null;
   }[];
   retours: { missionId: number; titreMission: string; meteo: Meteo; mot: string; recuLe: string }[];
+  charge: Charge;
 };
+
+/** Charge hebdomadaire d'une participante, comparée au temps qu'elle a dit pouvoir donner. */
+export type Charge = { minutesEngagees: number; minutesDisponibles: number; surEngagement: boolean; finEngagement: string };
 
 type MissionCatalogue = Omit<
   MissionProposee,
@@ -347,6 +351,28 @@ export function etatMoi(dossier: Dossier | null, maintenant: Date = new Date()):
   return { participant: dossier.participant, missions, meteoDeverrouillee: meteoDeverrouillee(dossier.missions) };
 }
 
+/**
+ * Minutes engagées par semaine : missions choisies (`yes`) pas encore faites ; une mission récurrente
+ * ne compte que tant que son inscription court. Fin d'engagement : lancement + 1 an (« un an au plus »).
+ */
+export function charge(dossier: Dossier, maintenant: Date): Charge {
+  const minutesEngagees = dossier.missions.reduce((total, m) => {
+    const c = missionDuCatalogue(m.id);
+    if (!c || m.statut !== "yes") return total;
+    if (c.recurrence && !inscriptionEnCours(m, maintenant)) return total;
+    return total + c.duree;
+  }, 0);
+  const minutesDisponibles = dossier.participant.temps;
+  const fin = new Date(dossier.participant.lanceLe);
+  fin.setUTCFullYear(fin.getUTCFullYear() + 1);
+  return {
+    minutesEngagees,
+    minutesDisponibles,
+    surEngagement: minutesEngagees > minutesDisponibles,
+    finEngagement: Number.isNaN(fin.getTime()) ? "" : fin.toISOString(),
+  };
+}
+
 export function suiviParticipant(dossier: Dossier, retours: RetourMeteo[], maintenant: Date = new Date()): SuiviParticipant {
   return {
     ...dossier.participant,
@@ -363,5 +389,6 @@ export function suiviParticipant(dossier: Dossier, retours: RetourMeteo[], maint
     retours: [...retours]
       .sort((a, b) => b.recuLe.localeCompare(a.recuLe))
       .map((r) => ({ missionId: r.missionId, titreMission: missionDuCatalogue(r.missionId)?.titre ?? "", meteo: r.meteo, mot: r.mot, recuLe: r.recuLe })),
+    charge: charge(dossier, maintenant),
   };
 }

@@ -191,6 +191,44 @@
   margin-left: 0;
 }
 
+/* Sur-engagement : badges, jauge douce et conseil */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.charge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chargeTexte {
+  margin: 0;
+  font-size: 15px;
+}
+.jauge {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--doux);
+  border: 1px solid var(--ligne-forte);
+  overflow: hidden;
+}
+.jaugeRemplie {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sauge);
+}
+.jaugeAuDela {
+  background: #9a3412;
+}
+.chargeConseil {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #9a3412;
+}
+
 .etape {
   display: grid;
   grid-template-columns: auto minmax(220px, 340px) 1fr;

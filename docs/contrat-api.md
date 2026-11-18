@@ -6,12 +6,12 @@ Toutes les routes métier sont sous `/api/v1`, en JSON, appelées en **chemin re
 
 Pas de connexion, de compte ni de mot de passe. Au lancement, le front affiche « Qui êtes-vous ? » et on choisit la persona qu'on incarne, une par rôle du scénario :
 
-| Persona | Rôle | Identifiant (UUID fixe) |
+| Persona | Rôle | Identifiant |
 |---|---|---|
-| Camille | La BURN'ette en remobilisation | `c0a1e000-0000-4000-8000-000000000001` |
+| Camille | La BURN'ette en remobilisation | UUID **propre à chaque appareil** (`localStorage` `filactiv.participant`, créé au premier passage) ; repli sur `c0a1e000-0000-4000-8000-000000000001` si le navigateur ne peut rien garder |
 | Sarah | La chargée de remobilisation | — (écran accompagnante) |
 
-Le choix est gardé dans `localStorage` (`filactiv.persona`) ; un bouton en haut de l'écran permet d'en changer à tout moment. Côté BURN'ette, l'identifiant est envoyé dans l'en-tête **`X-Participant: <uuid>`** sur toutes les routes `/api/v1/moi*` et `/api/v1/meteo`. En-tête absent ou pas un UUID → `400`.
+Une BURN'ette par appareil (itération 15) : plusieurs testeurs peuvent incarner Camille en même temps sans s'écraser. Le choix de persona est gardé dans `localStorage` (`filactiv.persona`) ; un bouton en haut de l'écran permet d'en changer à tout moment. Côté BURN'ette, l'identifiant est envoyé dans l'en-tête **`X-Participant: <uuid>`** sur toutes les routes `/api/v1/moi*` et `/api/v1/meteo`. En-tête absent ou pas un UUID → `400`.
 
 ## Types
 

@@ -76,7 +76,8 @@ Création du profil par la chargée (back-office), validation des pitchs et cré
 
 - **Temps restant annoncé** : 45 minutes. Une itération = ~10 min de codage + ~5 min de publication + ~10 min de test → **une itération pleine et une courte**, la fin sert à stabiliser le pitch.
 - **Progression (retour 9)** : déjà livrée (Sarah valide le passage d'étape depuis son espace) ; ce n'est plus un écart.
-- ✂️ **Hors du temps restant** : missions récurrentes (inscription pour une durée + rappel hebdomadaire de disponibilité, retour 5). Il faut un modèle de récurrence, des confirmations par semaine et un écran côté Sarah : bien au-delà de 10 minutes. Première tâche du prochain build.
+- ✂️ ~~Hors du temps restant : missions récurrentes~~ → **réintégrée** (itération 10) quand l'heure de fin a été précisée (18 h, soit 63 minutes à 16 h 57), et codée en parallèle par un sous-agent.
+- **Versions signalées à PM Lab** : v2 (16 h 45, itérations 1 à 7), v3 (17 h 16, itérations 8 à 12), v4 (17 h 19, itération 13). `moteur_avance: false` à chaque fois : la version est enregistrée et part en test, sans avancer l'étape PM Lab.
 
 ## Itération 8 : comprendre l'engagement avant de se lancer (retour 2)
 
@@ -98,7 +99,17 @@ Création du profil par la chargée (back-office), validation des pitchs et cré
   - Étant donné « éviter le téléphone », quand les missions sont calculées, alors l'écoute téléphonique n'est jamais proposée.
 - **Codage estimé** : 5 minutes. **Fichiers prévus** : `api/src/domaine.ts`, `components/Missions.tsx`, `lib/api.ts`.
 - **Tests prévus** : proposition avec et sans « éviter le téléphone ».
-- **Bilan** : _à remplir._
+- **Bilan** : fait par un sous-agent, en parallèle de l'itération 8. Champ `formation: { id, nom, chemin } | null` sur `MissionProposee` ; missions 7 (permanence de parole du jeudi matin) et 8 (écoute téléphonique), qui exigent la **Pair-aidance** (passation : préalable aux permanences et écoutes) ; nouvelle règle : « éviter le téléphone » exclut l'écoute téléphonique. Fiche mission : « Formation requise avant de commencer : Pair-aidance » et le chemin (onglet Parcours, Sarah valide). Fichiers : `api/src/domaine.ts`, `components/Missions.tsx`, `lib/api.ts`. Tests : `domaine.test.ts` (téléphone, `formation` dans `etatMoi`). ⚠️ Titres et détails des missions 7 et 8 : exemples à valider avec l'équipe.
+
+## Itération 10 : missions récurrentes, inscription pour une durée et rappel hebdomadaire (retour 5)
+
+- **Dans le périmètre** : pour une mission récurrente, « Je tente » demande une durée (1, 3 ou 6 mois, « sans engagement de résultat ») ; la fiche affiche « Inscrite jusqu'au … » et, chaque semaine, « Jeudi … : es-tu disponible ? » (« Oui, je serai là » / « Pas cette semaine », sans justification). Sarah voit l'inscription et la disponibilité de la semaine.
+- **Hors périmètre** : rappel par SMS ou notification (rappel dans l'application uniquement).
+- **Critères d'acceptation** :
+  - Étant donné la permanence du jeudi, quand Camille clique « Je tente » et choisit 6 mois, alors elle est inscrite jusqu'à la date correspondante.
+  - Étant donné une inscription en cours, quand elle répond au rappel de la semaine, alors sa réponse est enregistrée et modifiable.
+  - Étant donné cette réponse, quand Sarah ouvre son espace, alors elle voit « Inscrite jusqu'au … · cette semaine : oui / pas cette semaine / pas encore répondu ».
+- **Bilan** : fait par un sous-agent, en parallèle (~15 min). `PUT /api/v1/moi/missions/:id` accepte `dureeMois` (1, 3, 6) ; `POST /api/v1/moi/missions/:id/disponibilite` (une réponse par semaine ISO, la dernière gagne) ; colonne `missions_participant.inscrite_jusquau`, table `disponibilites`. Fonctions pures `semaineIso`, `finInscription`, `prochainJour`. Front : `components/Missions.tsx`, `lib/recurrence.ts`. Tests : `domaine.test.ts`, `routes.test.ts`, `recurrence.test.ts`. Limites : dates calculées en UTC côté API (décalage possible entre 0 h et 1 h à Paris) ; textes du rappel à valider.
 
 ## Itération 11 : le chemin de formation, validé petit à petit (retour équipe, 17 h 08)
 
@@ -118,11 +129,24 @@ Création du profil par la chargée (back-office), validation des pitchs et cré
 - **Critère d'acceptation** : étant donné une BURN'ette au local, avec du temps, une énergie qui n'est pas basse et l'envie « être avec d'autres personnes », quand ses missions sont calculées, alors la permanence du jeudi fait partie des 2 propositions.
 - **Bilan** : fait. Règle de variété dans `proposerMissions` (`api/src/domaine.ts`) : une mission récurrente éligible qui correspond à une envie prend la 2e place ; jamais en énergie basse (effort moyen exclu). Tests : `domaine.test.ts` (variété), attentes mises à jour dans `routes.test.ts`. ⚠️ Règle choisie pour la démo, à valider avec l'équipe.
 
+## Itération 14 : le sur-engagement visible chez la chargée (passation : « le sur-engagement doit rester visible »)
+
+- **Critères d'acceptation** :
+  - Étant donné une BURN'ette qui a choisi plus de minutes par semaine qu'elle n'en donne, quand Sarah ouvre son espace, alors sa carte affiche « Au-delà de son temps » et une jauge « X min engagées / Y min par semaine ».
+  - Étant donné l'espace de Sarah, quand il s'affiche, alors le résumé compte les BURN'ettes en sur-engagement et les place après les « À recontacter ».
+  - Étant donné une BURN'ette lancée, alors sa carte rappelle « Engagement jusqu'au … (un an au plus) ».
+- **Bilan** : fait par un sous-agent, en parallèle du passage navigateur. Fonction pure `charge(dossier, maintenant)` (`api/src/domaine.ts`) : missions « je tente » + missions récurrentes pendant leur inscription ; exposée dans le suivi. Front : `lib/accompagnante.ts`, `app/accompagnante/page.tsx`. Tests : `domaine.test.ts` (3), `accompagnante.test.ts` (2).
+
+## Itération 15 : corrections du passage dans le navigateur (17 h 25)
+
+- **Constats** sur l'URL publique : le point de départ du chemin dessiné restait bleu (couleur codée en dur avant la DA) ; la zone « Un mot pour Sarah » était écrasée à une ligne ; surtout, **deux testeurs incarnant Camille en même temps s'écrasaient** (le dossier de test a pris le prénom d'une autre personne pendant le tour de test).
+- **Bilan** : point de départ en rouge L'Burn, hauteur minimale des zones de texte, et **une BURN'ette par appareil** : l'écran « Qui êtes-vous ? » reste, mais chaque appareil reçoit son propre identifiant (gardé dans le navigateur), et Sarah voit chaque testeur comme une BURN'ette distincte. Fichiers : `lib/personas.ts`, `lib/api.ts`, `components/Icones.tsx`, `globals.css`. Tests : `personas.test.ts`, `api.test.ts`.
+
 ## À venir
 
-- Missions récurrentes : inscription pour une durée (ex. 6 mois) et rappel hebdomadaire de disponibilité.
-- Sarah ajuste les missions d'une BURN'ette (retour 9).
-- Faire valider ce découpage et les écarts par les cadreurs (tour de test PM Lab).
-- Corriger les dates de la maquette (année 2026) avec l'équipe.
-- Décider si l'écran de la chargée garde le changement d'étape (hors périmètre du PRD).
-- Démo Playwright `e2e/demo.spec.ts` : rejouer le cas passant Camille → Sarah.
+- Sarah ajuste les missions d'une BURN'ette (retour 9) : plus de 15 minutes, reporté après le hackathon.
+- Rappel de disponibilité par SMS (aujourd'hui : dans l'application).
+- Faire valider ce découpage, les textes provisoires et la règle de variété par les cadreurs (tour de test PM Lab).
+- Corriger les dates de la maquette (« jeu. 20 », « mardi 25 nov. » sont les jours de 2025) : dates à choisir par l'équipe.
+- Démo Playwright `e2e/demo.spec.ts` : Chromium absent de la VM, reportée.
+- ~~Décider si l'écran de la chargée garde le changement d'étape~~ : tranché par le retour métier 9 (Sarah valide le passage d'étape).

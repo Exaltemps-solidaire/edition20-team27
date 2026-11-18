@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   compterPluiesRecentes,
+  compterSurEngagements,
+  pourcentageCharge,
   formaterDate,
   trierParticipants,
   typeErreurHttp,
@@ -66,5 +68,28 @@ describe("espace accompagnante", () => {
     expect(formaterDate("2026-10-02T09:00:00", MAINTENANT)).toBe("2 octobre 2026");
     expect(typeErreurHttp(401)).toBe("code-incorrect");
     expect(typeErreurHttp(503)).toBe("non-configure");
+  });
+});
+
+describe("sur-engagement", () => {
+  const charge = (minutesEngagees: number, minutesDisponibles: number) => ({
+    minutesEngagees, minutesDisponibles, surEngagement: minutesEngagees > minutesDisponibles, finEngagement: "2027-11-10T09:00:00.000Z",
+  });
+
+  it("trie : à recontacter, puis sur-engagées, puis les autres ; compte les sur-engagées", () => {
+    const liste: SuiviParticipant[] = [
+      { ...participante("Calme", "2026-11-15T09:00:00"), charge: charge(30, 120) },
+      { ...participante("Sur", "2026-10-01T09:00:00"), charge: charge(150, 120) },
+      participante("SansCharge", "2026-11-16T09:00:00"),
+      { ...participante("Pluie", "2026-09-01T09:00:00", [retour("pluie", "2026-11-17T09:00:00")]), charge: charge(0, 30) },
+    ];
+    expect(trierParticipants(liste, MAINTENANT).map((p) => p.id)).toEqual(["Pluie", "Sur", "SansCharge", "Calme"]);
+    expect(compterSurEngagements(liste)).toBe(1);
+  });
+
+  it("calcule la jauge plafonnée à 100 %", () => {
+    expect(pourcentageCharge(charge(60, 120))).toBe(50);
+    expect(pourcentageCharge(charge(150, 120))).toBe(100);
+    expect(pourcentageCharge(charge(0, 30))).toBe(0);
   });
 });

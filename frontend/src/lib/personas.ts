@@ -46,10 +46,34 @@ export function ecrirePersona(id: PersonaId | null, stockage: Pick<Storage, "set
   sansErreur(() => (id ? stockage?.setItem(CLE_PERSONA, id) : stockage?.removeItem(CLE_PERSONA)));
 }
 
-/** Identifiant de la BURN'ette incarnée (Camille par défaut). */
-export function participantIdCourant(stockage?: Pick<Storage, "getItem"> | null): string {
-  const p = lirePersona(stockage);
-  return p?.participantId ?? PERSONAS[0].participantId!;
+export const CLE_PARTICIPANT = "filactiv.participant";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Identifiant de la BURN'ette incarnée. Une par appareil : plusieurs testeurs peuvent incarner
+ * Camille en même temps sans s'écraser (constat du tour de test : une Camille partagée se faisait
+ * écraser). Créé au premier passage et gardé dans localStorage ; repli sur l'identifiant fixe.
+ */
+export function participantIdCourant(
+  stockage: Pick<Storage, "getItem" | "setItem"> | null = sansErreur(() => localStorage),
+  nouvelId: () => string = uuidAleatoire,
+): string {
+  const existant = sansErreur(() => stockage?.getItem(CLE_PARTICIPANT));
+  if (existant && UUID.test(existant)) return existant;
+  const id = sansErreur(nouvelId);
+  if (!id || !UUID.test(id)) return PERSONAS[0].participantId!;
+  sansErreur(() => stockage?.setItem(CLE_PARTICIPANT, id));
+  return id;
+}
+
+/** UUID v4 ; `crypto.randomUUID` n'existe qu'en contexte sécurisé, d'où le repli. */
+function uuidAleatoire(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const o = crypto.getRandomValues(new Uint8Array(16));
+  o[6] = (o[6] & 0x0f) | 0x40;
+  o[8] = (o[8] & 0x3f) | 0x80;
+  const h = Array.from(o, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
 function sansErreur<T>(f: () => T): T | null {

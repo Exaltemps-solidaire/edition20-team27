@@ -44,7 +44,11 @@ export type SuiviParticipant = Participant & {
     disponibiliteSemaine?: boolean | null;
   }[];
   retours: RetourMeteo[];
+  /** Charge hebdomadaire vs temps disponible (facultatif : absent pour une API plus ancienne). */
+  charge?: Charge;
 };
+
+export type Charge = { minutesEngagees: number; minutesDisponibles: number; surEngagement: boolean; finEngagement: string };
 
 // Les 5 étapes du parcours (index 0..4 côté API).
 export const ETAPES_PARCOURS = [
@@ -127,12 +131,32 @@ export function compterPluiesRecentes(liste: SuiviParticipant[], maintenant: Dat
   return liste.reduce((total, p) => total + pluiesRecentes(p, maintenant), 0);
 }
 
-/** Celles qui ont un retour « pluie » récent d'abord, puis la plus récemment lancée d'abord. Ne modifie pas la liste. */
+export function enSurEngagement(p: SuiviParticipant): boolean {
+  return p.charge?.surEngagement === true;
+}
+
+export function compterSurEngagements(liste: SuiviParticipant[]): number {
+  return liste.filter(enSurEngagement).length;
+}
+
+/** Part de la jauge (0 à 100) : minutes engagées sur minutes disponibles, plafonnée à 100. */
+export function pourcentageCharge(c: Charge): number {
+  if (c.minutesDisponibles <= 0) return c.minutesEngagees > 0 ? 100 : 0;
+  return Math.min(100, Math.round((c.minutesEngagees / c.minutesDisponibles) * 100));
+}
+
+/**
+ * Celles qui ont un retour « pluie » récent d'abord, puis celles en sur-engagement,
+ * puis la plus récemment lancée d'abord. Ne modifie pas la liste.
+ */
 export function trierParticipants(liste: SuiviParticipant[], maintenant: Date = new Date()): SuiviParticipant[] {
   return [...liste].sort((a, b) => {
     const urgenceA = pluiesRecentes(a, maintenant) > 0 ? 1 : 0;
     const urgenceB = pluiesRecentes(b, maintenant) > 0 ? 1 : 0;
     if (urgenceA !== urgenceB) return urgenceB - urgenceA;
+    const surA = enSurEngagement(a) ? 1 : 0;
+    const surB = enSurEngagement(b) ? 1 : 0;
+    if (surA !== surB) return surB - surA;
     return (Date.parse(b.lanceLe) || 0) - (Date.parse(a.lanceLe) || 0);
   });
 }

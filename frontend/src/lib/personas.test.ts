@@ -28,7 +28,11 @@ describe("personas « Qui êtes-vous ? »", () => {
     expect(lirePersona(s)).toBeNull();
   });
 
-  it("envoie toujours l'identifiant de Camille côté BURN'ette", () => {
-    expect(participantIdCourant(stockageMemoire())).toBe(PERSONAS[0].participantId);
+  it("crée une BURN'ette par appareil et la garde, avec repli sur l'identifiant fixe", () => {
+    const s = stockageMemoire();
+    const id = participantIdCourant(s, () => "11111111-2222-4333-8444-555555555555");
+    expect(id).toBe("11111111-2222-4333-8444-555555555555");
+    expect(participantIdCourant(s, () => "autre")).toBe(id);
+    expect(participantIdCourant(stockageMemoire(), () => "pas-un-uuid")).toBe(PERSONAS[0].participantId);
   });
 });

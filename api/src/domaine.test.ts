@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  etatMoi, finInscription, fusionnerMissions, lireIdParticipant, MOT_MAX, prochainJour, proposerMissions, semaineIso,
+  charge, etatMoi, finInscription, fusionnerMissions, lireIdParticipant, MOT_MAX, prochainJour, proposerMissions, semaineIso,
   validerProfil, validerRetour,
 } from "./domaine.ts";
 import type { Dossier, MissionStockee, Profil } from "./domaine.ts";
@@ -150,5 +150,34 @@ describe("variété des propositions (itération 13)", () => {
     expect(ids(local)).toContain(7);
     expect(ids({ ...local, energie: "bas" })).not.toContain(7);
     expect(ids({ ...local, envies: ["manuel"] })).not.toContain(7);
+  });
+});
+
+describe("charge (sur-engagement)", () => {
+  const maintenant = new Date("2026-11-18T09:00:00.000Z");
+  const dossier = (temps: Profil["temps"], missions: MissionStockee[]): Dossier => ({
+    id: "x", participant: { ...base, temps, etape: 0, formatRdv: null, formationsValidees: [], lanceLe: "2026-03-01T10:00:00.000Z" }, missions,
+  });
+
+  it("additionne les missions choisies (yes) et reste sous le temps disponible", () => {
+    const d = dossier(120, [
+      { id: 2, statut: "yes", pourquoi: [] }, { id: 4, statut: "yes", pourquoi: [] },
+      { id: 1, statut: "done", pourquoi: [] }, { id: 3, statut: "open", pourquoi: [] },
+    ]);
+    expect(charge(d, maintenant)).toEqual({
+      minutesEngagees: 75, minutesDisponibles: 120, surEngagement: false, finEngagement: "2027-03-01T10:00:00.000Z",
+    });
+  });
+
+  it("signale le sur-engagement au-delà du temps donné", () => {
+    const d = dossier(30, [{ id: 1, statut: "yes", pourquoi: [] }]);
+    expect(charge(d, maintenant)).toMatchObject({ minutesEngagees: 90, minutesDisponibles: 30, surEngagement: true });
+  });
+
+  it("compte une mission récurrente seulement tant que son inscription court", () => {
+    const enCours = dossier(120, [{ id: 7, statut: "yes", pourquoi: [], inscriteJusquau: "2027-02-18T09:00:00.000Z" }, { id: 2, statut: "yes", pourquoi: [] }]);
+    expect(charge(enCours, maintenant)).toMatchObject({ minutesEngagees: 150, surEngagement: true });
+    const finie = dossier(120, [{ id: 7, statut: "yes", pourquoi: [], inscriteJusquau: "2026-11-01T00:00:00.000Z" }]);
+    expect(charge(finie, maintenant)).toMatchObject({ minutesEngagees: 0, surEngagement: false });
   });
 });
