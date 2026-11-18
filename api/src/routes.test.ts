@@ -43,7 +43,7 @@ describe("router", () => {
     expect(lance.statut).toBe(200);
     const etat = lance.corps as { participant: { etape: number; formatRdv: null }; missions: { id: number; statut: string; pourquoi: string[] }[] };
     expect(etat.participant).toMatchObject({ prenom: "Camille", etape: 0, formatRdv: null });
-    expect(etat.missions.map((m) => [m.id, m.statut])).toEqual([[1, "open"], [5, "open"]]);
+    expect(etat.missions.map((m) => [m.id, m.statut])).toEqual([[1, "open"], [7, "open"]]);
     expect(etat.missions[0]).toMatchObject({ titre: "Accueillir les nouvelles à l'atelier du jeudi", duree: 90, effort: "léger", avec: "En binôme" });
 
     expect((await appel("POST", "/api/v1/meteo", { missionId: 1, meteo: "soleil" })).statut).toBe(409);

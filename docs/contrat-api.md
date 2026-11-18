@@ -90,6 +90,7 @@ Catalogue fixe de 8 missions (ids 1 à 6, textes de la maquette ; 7 « permanenc
 - si `eviter` contient `groupe` : pas de tag `contact` ; `ecrans` : pas de tag `ecran` ; `delais` : pas de tag `delai` ; `telephone` : pas de tag `telephone`.
 
 Score = nombre de tags dans `envies`. Tri : score décroissant, puis durée croissante. On propose les **2 premières**.
+**Variété** (itération 13) : si une mission récurrente est éligible, correspond à au moins une envie et n'est pas dans les 2 premières, elle prend la 2e place.
 `pourquoi` = [lieu en minuscules, "tient dans ton temps", ("effort léger" si énergie basse), libellés des envies correspondantes en minuscules].
 
 Quand le profil change : les missions `yes` ou `done` sont **conservées** ; les `open`/`no` qui ne sont plus proposées sont retirées ; les nouvelles proposées sont ajoutées en `open`.

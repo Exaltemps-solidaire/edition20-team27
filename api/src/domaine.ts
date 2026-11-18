@@ -241,10 +241,17 @@ export function proposerMissions(profil: Profil): { id: number; pourquoi: string
     return true;
   });
   const envies = (m: MissionCatalogue) => profil.envies.filter((e) => m.tags.includes(e));
-  return eligibles
+  const triees = eligibles
     .map((m) => ({ m, correspondances: envies(m) }))
-    .sort((a, b) => b.correspondances.length - a.correspondances.length || a.m.duree - b.m.duree)
-    .slice(0, NB_PROPOSITIONS)
+    .sort((a, b) => b.correspondances.length - a.correspondances.length || a.m.duree - b.m.duree);
+  const retenues = triees.slice(0, NB_PROPOSITIONS);
+  // Variété (retour métier, itération 13) : si une mission récurrente est éligible et correspond à au
+  // moins une envie, elle prend la 2e place, pour qu'une BURN'ette puisse s'inscrire dans la durée.
+  const recurrente = triees.find(({ m, correspondances }) => m.recurrence && correspondances.length > 0);
+  if (recurrente && !retenues.includes(recurrente) && retenues.length === NB_PROPOSITIONS) {
+    retenues[NB_PROPOSITIONS - 1] = recurrente;
+  }
+  return retenues
     .map(({ m, correspondances }) => ({
       id: m.id,
       pourquoi: [

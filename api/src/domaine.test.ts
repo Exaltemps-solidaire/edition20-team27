@@ -12,7 +12,7 @@ describe("proposerMissions", () => {
   it("trie par envies correspondantes puis par durée et explique pourquoi", () => {
     expect(proposerMissions({ ...base, lieux: ["local"], envies: ["contact"] })).toEqual([
       { id: 1, pourquoi: ["au local", "tient dans ton temps", "être avec d'autres personnes"] },
-      { id: 5, pourquoi: ["au local", "tient dans ton temps", "être avec d'autres personnes"] },
+      { id: 7, pourquoi: ["au local", "tient dans ton temps", "être avec d'autres personnes"] },
     ]);
     expect(ids({ lieux: ["chez-moi"] })).toEqual([2, 6]);
     expect(ids({ lieux: ["chez-moi"], envies: ["organisation"] })).toEqual([4, 2]);
@@ -141,5 +141,14 @@ describe("missions récurrentes (itération 10)", () => {
     });
     expect(etat(mission({ inscriteJusquau: "2026-11-01T00:00:00.000Z" }))).toMatchObject({ rappel: null, disponibiliteSemaine: null });
     expect(etat(mission({ statut: "open", inscriteJusquau: null }))).toMatchObject({ rappel: null, inscriteJusquau: null });
+  });
+});
+
+describe("variété des propositions (itération 13)", () => {
+  it("fait une place à une mission récurrente qui correspond à une envie, jamais en énergie basse", () => {
+    const local = { ...base, lieux: ["local" as const], temps: 240 as const, envies: ["contact" as const] };
+    expect(ids(local)).toContain(7);
+    expect(ids({ ...local, energie: "bas" })).not.toContain(7);
+    expect(ids({ ...local, envies: ["manuel"] })).not.toContain(7);
   });
 });

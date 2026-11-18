@@ -112,6 +112,12 @@ Création du profil par la chargée (back-office), validation des pitchs et cré
 
 - **Bilan** : fait par un sous-agent, en parallèle. Palette relevée sur lesburn-ettes.com (rouge `#dc3129`, saumon, rose poudré, crème), titres en Archivo Black, texte en Libre Franklin, boutons en pilule. Rouge assombri en `#c42b24` pour le texte (contraste AA) ; couleur de soutien prune ajoutée (absente du site). Seulement des valeurs CSS, aucune classe renommée.
 
+## Itération 13 : la permanence du jeudi apparaît dans les propositions
+
+- **Constat** : avec la règle « score puis durée », la permanence (120 min) n'arrivait jamais dans les 2 propositions, donc la récurrence n'était pas démontrable.
+- **Critère d'acceptation** : étant donné une BURN'ette au local, avec du temps, une énergie qui n'est pas basse et l'envie « être avec d'autres personnes », quand ses missions sont calculées, alors la permanence du jeudi fait partie des 2 propositions.
+- **Bilan** : fait. Règle de variété dans `proposerMissions` (`api/src/domaine.ts`) : une mission récurrente éligible qui correspond à une envie prend la 2e place ; jamais en énergie basse (effort moyen exclu). Tests : `domaine.test.ts` (variété), attentes mises à jour dans `routes.test.ts`. ⚠️ Règle choisie pour la démo, à valider avec l'équipe.
+
 ## À venir
 
 - Missions récurrentes : inscription pour une durée (ex. 6 mois) et rappel hebdomadaire de disponibilité.
